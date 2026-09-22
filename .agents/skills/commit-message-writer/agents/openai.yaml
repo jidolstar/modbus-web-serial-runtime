@@ -1,0 +1,4 @@
+interface:
+  display_name: "Commit Message Writer"
+  short_description: "Summarize repository changes and reasons safely"
+  default_prompt: "Write a concise commit message that explains what changed and why without exposing sensitive information."

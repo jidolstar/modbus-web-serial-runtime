@@ -1,8 +1,46 @@
 # Modbus Web Serial Runtime
 
-Web Serial API에서 Profile/Recipe 기반으로 Modbus RTU 장비를 실행하는 프런트엔드 런타임입니다.
+브라우저의 Web Serial API로 Modbus RTU 장비를 연결하고, Profile과 Recipe를 이용해 장비별 동작을 정의하는 웹 애플리케이션입니다.
 
-표준적인 Modbus 장비는 실행 엔진이 지원하는 Step과 decoder 범위 안에서 JSON Profile/Recipe 등록만으로 추가할 수 있습니다.
+표준적인 Modbus 장비는 실행 엔진이 지원하는 Step과 decoder 범위 안에서 JSON Profile/Recipe 등록만으로 추가하는 것을 목표로 합니다. 새로운 프로토콜 기능이 실제로 필요할 때만 실행 엔진을 확장합니다.
+
+현재 CWT-TH04S 온습도 센서의 측정, 장치 탐색 기반, Slave ID 및 baudrate 변경 workflow를 구현했습니다. Backend는 현재 health endpoint만 제공하며 인증, 데이터베이스와 장비 관리 API는 후속 단계입니다.
+
+## 설계 원칙
+
+```text
+Browser / Frontend
+  ├─ Web Serial 연결과 연결 상태 관리
+  ├─ Modbus RTU frame 및 transaction
+  ├─ Profile/Recipe 검증과 실행
+  └─ 측정, Scan, 장비 설정 workflow
+
+Backend
+  └─ 인증, 권한, 영속화와 관리 API (구축 예정)
+
+MySQL
+  └─ 사용자, 세션, 장비 메타데이터 (연동 예정)
+```
+
+USB Serial 통신은 사용자의 브라우저에서 실행됩니다. Docker container나 Backend에 USB 장치를 전달하지 않습니다.
+
+## 저장소 구조
+
+```text
+.
+├─ frontend/
+│  ├─ src/serial/           Web Serial transport와 연결 생명주기
+│  ├─ src/modbus/           RTU codec, client와 transaction queue
+│  ├─ src/device-catalog/   Profile/Recipe contract와 검증
+│  ├─ src/recipe-engine/    제한된 Recipe 실행기
+│  ├─ src/application/      측정, Scan과 장비 설정 workflow
+│  └─ public/device-catalog 장비별 Profile/Recipe JSON
+├─ backend/                 NestJS/Fastify API 기반
+├─ docker/                  개발용 Docker Compose
+├─ .agents/skills/          저장소 전용 Codex/agent 작업 지침
+├─ AGENTS.md                공통 개발 원칙
+└─ .env.sample              공개 가능한 환경변수 예제
+```
 
 ## 시작
 
@@ -25,7 +63,7 @@ docker compose -f docker/docker-compose.yml down
 ```
 
 Frontend와 Backend 소스는 컨테이너에 bind mount되어 변경 시 자동으로 다시 빌드됩니다.
-초기 단계에서는 통신 기반을 먼저 검증하기 위해 데이터베이스를 포함하지 않습니다.
+현재 Compose에는 데이터베이스 서비스를 포함하지 않습니다. Backend DB 연동 시 동일한 `shared-net`의 MySQL을 사용합니다.
 
 두 서비스는 호스트 포트를 공개하지 않고 외부 Docker 네트워크 `shared-net`에만 연결됩니다.
 Cloudflare Tunnel의 서비스 대상은 `http://modbus-frontend:5173`과
@@ -34,6 +72,14 @@ Cloudflare Tunnel의 서비스 대상은 `http://modbus-frontend:5173`과
 ## 장비 등록
 
 Profile과 Recipe 작성 방법은 [Device Catalog 등록 안내](frontend/public/device-catalog/README.md)를 참고합니다.
+
+지원 중인 Step과 decoder로 표현할 수 있는 장비는 Frontend TypeScript를 수정하지 않고 Catalog 파일을 추가해 등록할 수 있습니다.
+
+## 개발 원칙
+
+기여하거나 자동화 도구로 코드를 변경할 때는 [AGENTS.md](AGENTS.md)를 먼저 확인합니다. 구현은 현재 요구사항을 해결하는 범위에서 짧고 명확하게 유지하며, 프로젝트 목적과 무관한 기능이나 추상화를 추가하지 않습니다.
+
+실제 환경변수, 인증정보, 회사 내부 문서와 임시 파일은 공개 저장소에 포함하지 않습니다.
 
 ## 라이선스
 

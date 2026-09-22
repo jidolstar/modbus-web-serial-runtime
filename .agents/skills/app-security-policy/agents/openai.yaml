@@ -1,0 +1,4 @@
+interface:
+  display_name: "Application Security Policy"
+  short_description: "Frontend and backend security policy for this repository"
+  default_prompt: "Apply the repository application security policy to this task."

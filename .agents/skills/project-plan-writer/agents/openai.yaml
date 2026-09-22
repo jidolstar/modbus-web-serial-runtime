@@ -1,0 +1,4 @@
+interface:
+  display_name: "프로젝트 계획서 작성"
+  short_description: "프로젝트 규칙에 맞춘 개발 계획서 생성 및 갱신"
+  default_prompt: "Use $project-plan-writer to create a concrete development plan for this project."

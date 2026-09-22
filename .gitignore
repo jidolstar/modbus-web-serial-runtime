@@ -4,7 +4,6 @@ _plan/
 _temp/
 temp/
 tmp/
-.agents/
 .codex/
 
 # 로컬 환경 설정과 secret 파일. 공개 가능한 예제만 예외로 추적한다.

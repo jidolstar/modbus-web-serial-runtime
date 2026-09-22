@@ -1,0 +1,4 @@
+interface:
+  display_name: "Secure Git Push"
+  short_description: "Block secrets and private files before public Git pushes"
+  default_prompt: "Audit this repository for secrets and private files before committing or pushing."
