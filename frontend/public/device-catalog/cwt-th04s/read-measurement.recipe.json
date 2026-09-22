@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1.0",
+  "id": "cwt-th04s.read-measurement",
+  "name": "CWT-TH04S 온습도 읽기",
+  "kind": "measurement",
+  "parameters": [
+    {
+      "name": "deviceId",
+      "label": "현재 Slave ID",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 247
+    }
+  ],
+  "steps": [
+    {
+      "id": "read-measurement-registers",
+      "type": "readHoldingRegisters",
+      "slaveId": "${deviceId}",
+      "address": 0,
+      "count": 2,
+      "saveAs": "measurementRegisters"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "humidity",
+      "source": "measurementRegisters[0]",
+      "decoder": "uint16",
+      "scale": 0.1,
+      "unit": "%RH"
+    },
+    {
+      "name": "temperature",
+      "source": "measurementRegisters[1]",
+      "decoder": "int16",
+      "scale": 0.1,
+      "unit": "°C"
+    }
+  ],
+  "onError": "stop"
+}

@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "1.0",
+  "id": "cwt-th04s.change-baudrate",
+  "name": "CWT-TH04S Baudrate 변경",
+  "kind": "configuration",
+  "parameters": [
+    {
+      "name": "deviceId",
+      "label": "현재 Slave ID",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 247
+    },
+    {
+      "name": "targetBaud",
+      "label": "변경할 Baudrate",
+      "type": "enum",
+      "values": [2400, 4800, 9600]
+    }
+  ],
+  "steps": [
+    {
+      "id": "write-new-baudrate",
+      "type": "writeSingleRegister",
+      "slaveId": "${deviceId}",
+      "address": 2001,
+      "value": {
+        "map": "baud-rate",
+        "key": "${targetBaud}"
+      }
+    },
+    {
+      "id": "wait-for-baud-application",
+      "type": "delay",
+      "milliseconds": 300
+    },
+    {
+      "id": "reopen-at-new-baudrate",
+      "type": "reopenSerial",
+      "baudRate": "${targetBaud}"
+    },
+    {
+      "id": "verify-new-baudrate",
+      "type": "probe",
+      "slaveId": "${deviceId}"
+    }
+  ],
+  "onError": "stop"
+}

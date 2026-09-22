@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "device-profile.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "manufacturer", "model", "serial", "slave", "recipes"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "id": { "$ref": "#/definitions/id" },
+    "manufacturer": { "type": "string", "minLength": 1 },
+    "model": { "type": "string", "minLength": 1 },
+    "serial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["default", "supportedBaudRates"],
+      "properties": {
+        "default": { "$ref": "#/definitions/serialConfig" },
+        "supportedBaudRates": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "slave": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["defaultId", "minId", "maxId"],
+      "properties": {
+        "defaultId": { "type": "integer", "minimum": 1, "maximum": 247 },
+        "minId": { "type": "integer", "minimum": 1, "maximum": 247 },
+        "maxId": { "type": "integer", "minimum": 1, "maximum": 247 }
+      }
+    },
+    "recipes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["probe"],
+      "properties": {
+        "probe": { "$ref": "#/definitions/id" },
+        "measurements": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/definitions/id" }
+        },
+        "changeSlaveId": { "$ref": "#/definitions/id" },
+        "changeBaudRate": { "$ref": "#/definitions/id" }
+      }
+    },
+    "maps": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 65535 }
+      }
+    }
+  },
+  "definitions": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+    },
+    "serialConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baudRate", "dataBits", "stopBits", "parity", "flowControl"],
+      "properties": {
+        "baudRate": { "type": "integer", "minimum": 1 },
+        "dataBits": { "enum": [7, 8] },
+        "stopBits": { "enum": [1, 2] },
+        "parity": { "enum": ["none", "even", "odd"] },
+        "flowControl": { "enum": ["none", "hardware"] }
+      }
+    }
+  }
+}

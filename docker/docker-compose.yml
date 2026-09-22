@@ -1,0 +1,56 @@
+services:
+  frontend:
+    container_name: modbus-frontend
+    build:
+      context: ../frontend
+      target: development
+    env_file:
+      - ../.env
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+    expose:
+      - "5173"
+    volumes:
+      - ../frontend:/app
+      - frontend_node_modules:/app/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - shared-net
+    restart: unless-stopped
+
+  backend:
+    container_name: modbus-backend
+    build:
+      context: ../backend
+      target: development
+    env_file:
+      - ../.env
+    expose:
+      - "3000"
+    volumes:
+      - ../backend:/app
+      - backend_node_modules:/app/node_modules
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://localhost:'+(process.env.PORT||3000)+'/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+    networks:
+      - shared-net
+    restart: unless-stopped
+
+networks:
+  shared-net:
+    external: true
+    name: shared-net
+
+volumes:
+  frontend_node_modules:
+  backend_node_modules:

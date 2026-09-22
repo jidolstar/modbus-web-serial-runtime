@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "1.0",
+  "id": "cwt-th04s",
+  "manufacturer": "CWT",
+  "model": "CWT-TH04S",
+  "serial": {
+    "default": {
+      "baudRate": 4800,
+      "dataBits": 8,
+      "stopBits": 1,
+      "parity": "none",
+      "flowControl": "none"
+    },
+    "supportedBaudRates": [2400, 4800, 9600]
+  },
+  "slave": {
+    "defaultId": 1,
+    "minId": 1,
+    "maxId": 247
+  },
+  "recipes": {
+    "probe": "cwt-th04s.probe",
+    "measurements": ["cwt-th04s.read-measurement"],
+    "changeSlaveId": "cwt-th04s.change-slave-id",
+    "changeBaudRate": "cwt-th04s.change-baudrate"
+  },
+  "maps": {
+    "baud-rate": {
+      "2400": 0,
+      "4800": 1,
+      "9600": 2
+    }
+  }
+}

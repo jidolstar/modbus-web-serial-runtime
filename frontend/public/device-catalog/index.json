@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1.0",
+  "profiles": [
+    "cwt-th04s/profile.json"
+  ],
+  "recipes": [
+    "cwt-th04s/probe.recipe.json",
+    "cwt-th04s/read-measurement.recipe.json",
+    "cwt-th04s/change-slave-id.recipe.json",
+    "cwt-th04s/change-baudrate.recipe.json"
+  ]
+}

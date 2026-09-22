@@ -1,0 +1,200 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "recipe.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "name", "kind", "steps", "onError"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "id": { "$ref": "#/definitions/id" },
+    "name": { "type": "string", "minLength": 1 },
+    "kind": { "enum": ["probe", "measurement", "configuration"] },
+    "parameters": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "oneOf": [
+          { "$ref": "#/definitions/integerParameter" },
+          { "$ref": "#/definitions/enumParameter" }
+        ]
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          { "$ref": "#/definitions/readHoldingRegistersStep" },
+          { "$ref": "#/definitions/writeSingleRegisterStep" },
+          { "$ref": "#/definitions/delayStep" },
+          { "$ref": "#/definitions/reopenSerialStep" },
+          { "$ref": "#/definitions/probeStep" },
+          { "$ref": "#/definitions/assertEqualsStep" }
+        ]
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/output" }
+    },
+    "onError": { "const": "stop" }
+  },
+  "definitions": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+    },
+    "variableName": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+    },
+    "variableReference": {
+      "type": "string",
+      "pattern": "^\\$\\{[A-Za-z][A-Za-z0-9_]*\\}$"
+    },
+    "mapLookup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["map", "key"],
+      "properties": {
+        "map": { "$ref": "#/definitions/id" },
+        "key": { "$ref": "#/definitions/variableReference" }
+      }
+    },
+    "value": {
+      "oneOf": [
+        { "type": "number" },
+        { "$ref": "#/definitions/variableReference" },
+        { "$ref": "#/definitions/mapLookup" }
+      ]
+    },
+    "stepBase": {
+      "type": "object",
+      "required": ["id", "type"],
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "type": { "type": "string" }
+      }
+    },
+    "integerParameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type", "minimum", "maximum"],
+      "properties": {
+        "name": { "$ref": "#/definitions/variableName" },
+        "label": { "type": "string", "minLength": 1 },
+        "type": { "const": "integer" },
+        "minimum": { "type": "integer" },
+        "maximum": { "type": "integer" }
+      }
+    },
+    "enumParameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type", "values"],
+      "properties": {
+        "name": { "$ref": "#/definitions/variableName" },
+        "label": { "type": "string", "minLength": 1 },
+        "type": { "const": "enum" },
+        "values": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "anyOf": [
+              { "type": "string" },
+              { "type": "number" }
+            ]
+          }
+        }
+      }
+    },
+    "readHoldingRegistersStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "slaveId", "address", "count", "saveAs"],
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "type": { "const": "readHoldingRegisters" },
+        "slaveId": { "$ref": "#/definitions/value" },
+        "address": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "count": { "type": "integer", "minimum": 1, "maximum": 125 },
+        "saveAs": { "$ref": "#/definitions/variableName" }
+      }
+    },
+    "writeSingleRegisterStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "slaveId", "address", "value"],
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "type": { "const": "writeSingleRegister" },
+        "slaveId": { "$ref": "#/definitions/value" },
+        "address": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "value": { "$ref": "#/definitions/value" }
+      }
+    },
+    "delayStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "milliseconds"],
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "type": { "const": "delay" },
+        "milliseconds": { "type": "integer", "minimum": 0, "maximum": 60000 }
+      }
+    },
+    "reopenSerialStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "baudRate"],
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "type": { "const": "reopenSerial" },
+        "baudRate": { "$ref": "#/definitions/value" }
+      }
+    },
+    "probeStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "slaveId"],
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "type": { "const": "probe" },
+        "slaveId": { "$ref": "#/definitions/value" }
+      }
+    },
+    "assertEqualsStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "actual", "expected"],
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "type": { "const": "assertEquals" },
+        "actual": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_]*(\\[[0-9]+\\])?$"
+        },
+        "expected": { "$ref": "#/definitions/value" }
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "source", "decoder"],
+      "properties": {
+        "name": { "$ref": "#/definitions/id" },
+        "source": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_]*\\[[0-9]+\\]$"
+        },
+        "decoder": { "enum": ["uint16", "int16"] },
+        "scale": { "type": "number" },
+        "offset": { "type": "number" },
+        "unit": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

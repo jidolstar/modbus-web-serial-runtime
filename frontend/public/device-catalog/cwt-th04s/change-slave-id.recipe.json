@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1.0",
+  "id": "cwt-th04s.change-slave-id",
+  "name": "CWT-TH04S Slave ID 변경",
+  "kind": "configuration",
+  "parameters": [
+    {
+      "name": "currentId",
+      "label": "현재 Slave ID",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 247
+    },
+    {
+      "name": "targetId",
+      "label": "변경할 Slave ID",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 247
+    }
+  ],
+  "steps": [
+    {
+      "id": "write-new-slave-id",
+      "type": "writeSingleRegister",
+      "slaveId": "${currentId}",
+      "address": 2000,
+      "value": "${targetId}"
+    },
+    {
+      "id": "wait-for-id-application",
+      "type": "delay",
+      "milliseconds": 300
+    },
+    {
+      "id": "verify-new-slave-id",
+      "type": "probe",
+      "slaveId": "${targetId}"
+    }
+  ],
+  "onError": "stop"
+}
