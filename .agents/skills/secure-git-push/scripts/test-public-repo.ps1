@@ -42,7 +42,9 @@ function Test-SecretText {
     $secretAssignmentPattern = '(?im)^\s*(?<key>GOOGLE_OIDC_CLIENT_SECRET|DATABASE_PASSWORD|MYSQL_ROOT_PASSWORD|JWT_SECRET|API_KEY|ACCESS_TOKEN|REFRESH_TOKEN)\s*[:=]\s*["'']?(?<value>[^\s"''#]+)'
     foreach ($match in [regex]::Matches($Text, $secretAssignmentPattern)) {
         $value = $match.Groups['value'].Value
-        $safePlaceholderPattern = '^(?:replace_|change_|example|sample|placeholder|your_|dummy|test|<|\$\{|x{4,})'
+        # Source code commonly maps a secret-named property from an environment object.
+        # Treat only those explicit expressions and obvious public placeholders as safe.
+        $safePlaceholderPattern = '^(?:replace_|change_|example|sample|placeholder|your_|dummy|test|env\.|required\(|googleValues\.|<|\$\{|x{4,})'
         if ($value -notmatch $safePlaceholderPattern) {
             Add-Finding -Category "Non-placeholder $($match.Groups['key'].Value)" -Location $Location
         }

@@ -1,0 +1,4 @@
+interface:
+  display_name: "API Swagger Docs"
+  short_description: "Maintain rich and safe NestJS Swagger documentation."
+  default_prompt: "Add or update Swagger documentation for the Backend APIs."
