@@ -15,6 +15,9 @@ const validEnvironment = {
   JWT_SECRET: 'test_jwt_secret_0123456789abcdef0123456789abcdef',
   AUTH_SESSION_TTL_SECONDS: '28800',
   AUTH_COOKIE_NAME: 'modbus_session',
+  CATALOG_UPLOAD_ROOT: '/tmp/modbus-manager-test-uploads',
+  CATALOG_FILE_MAX_BYTES: '20971520',
+  CATALOG_THUMBNAIL_MAX_BYTES: '10485760',
 }
 
 describe('loadAppConfig', () => {
@@ -56,6 +59,13 @@ describe('loadAppConfig', () => {
           NODE_ENV: 'production',
           CORS_ORIGIN: 'http://app.example.com',
         }),
+      ConfigurationError,
+    )
+  })
+
+  it('rejects an invalid Catalog upload size', () => {
+    assert.throws(
+      () => loadAppConfig({ ...validEnvironment, CATALOG_FILE_MAX_BYTES: '0' }),
       ConfigurationError,
     )
   })

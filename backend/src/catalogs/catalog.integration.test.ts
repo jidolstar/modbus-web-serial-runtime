@@ -76,7 +76,7 @@ describe('Catalog API integration', { skip: !runDatabaseTests }, () => {
         { enabled: false, revision: 3 },
       )
     } finally {
-      await database.deleteFrom('device_catalogs').where('catalog_key', '=', catalogKey).execute()
+      await database.deleteFrom('catalog').where('catalog_key', '=', catalogKey).execute()
       await database.deleteFrom('users').where('google_subject', '=', googleSubject).execute()
       await database.destroy()
     }

@@ -36,6 +36,7 @@ services:
       - ../backend:/workspace/backend
       - ../common/device-catalog-domain:/workspace/common/device-catalog-domain:ro
       - backend_node_modules:/workspace/backend/node_modules
+      - catalog_uploads:/var/lib/modbus-manager/catalog-uploads
     healthcheck:
       test:
         - CMD
@@ -58,3 +59,4 @@ networks:
 volumes:
   frontend_node_modules:
   backend_node_modules:
+  catalog_uploads:

@@ -2,6 +2,9 @@ const DEFAULT_SESSION_TTL_SECONDS = 28_800
 const MIN_SESSION_TTL_SECONDS = 300
 const MAX_SESSION_TTL_SECONDS = 86_400
 const MIN_JWT_SECRET_BYTES = 32
+const DEFAULT_CATALOG_FILE_MAX_BYTES = 20 * 1024 * 1024
+const DEFAULT_CATALOG_THUMBNAIL_MAX_BYTES = 10 * 1024 * 1024
+const DEFAULT_CATALOG_UPLOAD_ROOT = '/var/lib/modbus-manager/catalog-uploads'
 
 export const GOOGLE_CONFIGURATION_KEYS = [
   'GOOGLE_OIDC_CLIENT_ID',
@@ -40,6 +43,11 @@ export interface AppConfig {
     readonly clientSecret?: string
     readonly callbackUrl?: string
     readonly status: GoogleOidcConfigurationStatus
+  }
+  readonly catalogUploads: {
+    readonly rootPath: string // Backend 전용 volume의 절대 경로. 예: "/var/lib/modbus-manager/catalog-uploads"
+    readonly fileMaxBytes: number // 일반 참고 파일의 최대 크기. 예: 20971520
+    readonly thumbnailMaxBytes: number // 썸네일 원본의 최대 크기. 예: 10485760
   }
 }
 
@@ -175,6 +183,11 @@ export function loadAppConfig(env: Environment = process.env): AppConfig {
       clientSecret: googleValues.GOOGLE_OIDC_CLIENT_SECRET,
       callbackUrl,
       status: { configured: missing.length === 0, missing },
+    },
+    catalogUploads: {
+      rootPath: env.CATALOG_UPLOAD_ROOT?.trim() || DEFAULT_CATALOG_UPLOAD_ROOT,
+      fileMaxBytes: parseInteger(env, 'CATALOG_FILE_MAX_BYTES', DEFAULT_CATALOG_FILE_MAX_BYTES, 1_024, 100 * 1024 * 1024),
+      thumbnailMaxBytes: parseInteger(env, 'CATALOG_THUMBNAIL_MAX_BYTES', DEFAULT_CATALOG_THUMBNAIL_MAX_BYTES, 1_024, 25 * 1024 * 1024),
     },
   }
 }

@@ -9,6 +9,8 @@ import {
 import { DatabaseSchema } from './database.types'
 import { initialSchemaMigration } from './migrations/20260922_001_initial-schema'
 import { deviceCatalogsMigration } from './migrations/20260923_002-device-catalogs'
+import { catalogAssetsMigration } from './migrations/20260923_003-catalog-assets'
+import { renameCatalogDropDevicesMigration } from './migrations/20260923_004-rename-catalog-drop-devices'
 
 const MIGRATION_LOCK_NAME = 'modbus_manager_migrations'
 const MIGRATION_LOCK_TIMEOUT_SECONDS = 30
@@ -18,6 +20,8 @@ class StaticMigrationProvider implements MigrationProvider {
     return {
       '20260922_001_initial-schema': initialSchemaMigration,
       '20260923_002-device-catalogs': deviceCatalogsMigration,
+      '20260923_003-catalog-assets': catalogAssetsMigration,
+      '20260923_004-rename-catalog-drop-devices': renameCatalogDropDevicesMigration,
     }
   }
 }

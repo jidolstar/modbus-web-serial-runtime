@@ -22,6 +22,11 @@ describe('Swagger integration', { skip: !runIntegrationTests }, () => {
       '/api/catalogs/validate',
       '/api/catalogs/{catalogKey}',
       '/api/catalogs/{catalogKey}/status',
+      '/api/catalogs/{catalogKey}/thumbnail',
+      '/api/catalogs/{catalogKey}/files',
+      '/api/catalogs/{catalogKey}/files/{fileId}/download',
+      '/api/catalogs/{catalogKey}/links',
+      '/api/catalogs/{catalogKey}/links/{linkId}',
     ]) {
       assert.match(document, new RegExp(`"${path.replaceAll('/', '\\/')}"`))
     }

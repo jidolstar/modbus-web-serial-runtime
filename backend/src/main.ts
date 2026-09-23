@@ -3,6 +3,7 @@ import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify
 import cookie from '@fastify/cookie'
 import helmet from '@fastify/helmet'
 import rateLimit from '@fastify/rate-limit'
+import multipart from '@fastify/multipart'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import { AppModule } from './app.module'
 import { AppConfig } from './config/app-config'
@@ -21,6 +22,10 @@ async function bootstrap(): Promise<void> {
   await app.register(helmet)
   await app.register(rateLimit, {
     global: false,
+  })
+  await app.register(multipart, {
+    // Fastify 기본 1MB 제한보다 앱의 검증 상한을 먼저 적용하고, 서비스에서도 실제 stream byte를 다시 센다.
+    limits: { files: 1, fields: 4, parts: 5, fileSize: Math.max(config.catalogUploads.fileMaxBytes, config.catalogUploads.thumbnailMaxBytes) },
   })
   app.useGlobalFilters(new HttpExceptionFilter())
   app.setGlobalPrefix('api')

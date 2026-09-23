@@ -2,10 +2,10 @@ import { Inject, Injectable } from '@nestjs/common'
 import type { CatalogBundle } from '@modbus-manager/device-catalog-domain'
 import { Kysely, Selectable } from 'kysely'
 import { DATABASE } from '../database/database.module'
-import { DatabaseSchema, DeviceCatalogsTable } from '../database/database.types'
+import { CatalogsTable, DatabaseSchema } from '../database/database.types'
 import type { CatalogListQuery } from './catalog-input'
 
-export type CatalogRow = Selectable<DeviceCatalogsTable>
+export type CatalogRow = Selectable<CatalogsTable>
 
 export interface CatalogDefinitionValues {
   readonly catalogKey: string // Profile에서 추출한 DB unique key. 예: "cwt-th04s"
@@ -26,7 +26,7 @@ export class CatalogRepository {
 
   /** 등록 API에서 검증 완료된 Bundle과 사용자 ID를 하나의 row로 저장한다. */
   public async create(values: CatalogDefinitionValues, userId: number): Promise<CatalogRow> {
-    const result = await this.database.insertInto('device_catalogs').values({
+    const result = await this.database.insertInto('catalog').values({
       catalog_key: values.catalogKey,
       title: values.title,
       schema_version: values.schemaVersion,
@@ -42,8 +42,8 @@ export class CatalogRepository {
 
   /** 목록 API에서 검색·상태 조건을 적용하고 전체 개수와 현재 page를 함께 반환한다. */
   public async list(query: CatalogListQuery): Promise<{ readonly rows: CatalogRow[]; readonly total: number }> {
-    let rowsQuery = this.database.selectFrom('device_catalogs').selectAll()
-    let countQuery = this.database.selectFrom('device_catalogs').select(({ fn }) => fn.countAll().as('total'))
+    let rowsQuery = this.database.selectFrom('catalog').selectAll()
+    let countQuery = this.database.selectFrom('catalog').select(({ fn }) => fn.countAll().as('total'))
     if (query.enabled !== undefined) {
       rowsQuery = rowsQuery.where('enabled', '=', query.enabled)
       countQuery = countQuery.where('enabled', '=', query.enabled)
@@ -72,16 +72,16 @@ export class CatalogRepository {
 
   /** 상세·수정 API가 안정 key로 현재 row를 조회할 때 사용한다. */
   public findByKey(catalogKey: string): Promise<CatalogRow | undefined> {
-    return this.database.selectFrom('device_catalogs').selectAll().where('catalog_key', '=', catalogKey).executeTakeFirst()
+    return this.database.selectFrom('catalog').selectAll().where('catalog_key', '=', catalogKey).executeTakeFirst()
   }
 
   private findById(id: number): Promise<CatalogRow | undefined> {
-    return this.database.selectFrom('device_catalogs').selectAll().where('id', '=', id).executeTakeFirst()
+    return this.database.selectFrom('catalog').selectAll().where('id', '=', id).executeTakeFirst()
   }
 
   /** 수정 API에서 key와 revision이 모두 일치할 때만 전체 정의를 교체한다. */
   public async update(catalogKey: string, revision: number, values: CatalogDefinitionValues, userId: number): Promise<boolean> {
-    const result = await this.database.updateTable('device_catalogs').set({
+    const result = await this.database.updateTable('catalog').set({
       catalog_key: values.catalogKey,
       title: values.title,
       schema_version: values.schemaVersion,
@@ -96,7 +96,7 @@ export class CatalogRepository {
 
   /** 상태 API에서 definition을 건드리지 않고 enabled와 revision만 원자적으로 변경한다. */
   public async updateStatus(catalogKey: string, revision: number, enabled: boolean, userId: number): Promise<boolean> {
-    const result = await this.database.updateTable('device_catalogs').set({
+    const result = await this.database.updateTable('catalog').set({
       enabled,
       revision: revision + 1,
       updated_by_user_id: userId,

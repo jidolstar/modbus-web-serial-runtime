@@ -4,7 +4,7 @@
 
 표준적인 Modbus 장비는 실행 엔진이 지원하는 Step과 decoder 범위 안에서 JSON Profile/Recipe 등록만으로 추가하는 것을 목표로 합니다. 새로운 프로토콜 기능이 실제로 필요할 때만 실행 엔진을 확장합니다.
 
-현재 CWT-TH04S 온습도 센서의 측정, 장치 탐색 기반, Slave ID 및 baudrate 변경 workflow를 구현했습니다. Backend는 Google 인증과 서버 세션, MySQL migration, DB 기반 장비 Catalog 검증·관리 API를 제공합니다. Catalog 관리 UI와 API 기반 실행 전환은 후속 단계입니다.
+현재 CWT-TH04S 온습도 센서의 측정, 장치 탐색 기반, Slave ID 및 baudrate 변경 workflow를 구현했습니다. Backend는 Google 인증과 서버 세션, MySQL migration, DB 기반 장비 Catalog 검증·관리 API, 썸네일·참고 파일·HTTPS 링크 관리를 제공합니다. Catalog 관리 UI와 API 기반 실행 전환은 후속 단계입니다.
 
 ## 설계 원칙
 
@@ -18,10 +18,11 @@ Browser / Frontend
 Backend
   ├─ Google 인증과 서버 관리형 세션
   ├─ Catalog JSON 검증과 관리 API
+  ├─ 300×300 JPEG 썸네일과 참고 자료 API
   └─ MySQL 영속화와 migration
 
 MySQL
-  └─ 사용자, 세션, 장비 메타데이터 (연동 예정)
+  └─ 사용자, 세션, Catalog와 참고 자료 metadata
 ```
 
 USB Serial 통신은 사용자의 브라우저에서 실행됩니다. Docker container나 Backend에 USB 장치를 전달하지 않습니다.
@@ -67,6 +68,8 @@ docker compose -f docker/docker-compose.yml down
 
 Frontend와 Backend 소스는 컨테이너에 bind mount되어 변경 시 자동으로 다시 빌드됩니다.
 현재 Compose에는 데이터베이스 서비스를 포함하지 않습니다. Backend DB 연동 시 동일한 `shared-net`의 MySQL을 사용합니다.
+
+Catalog 첨부 파일은 `catalog_uploads` named volume에 저장됩니다. volume은 Backend에만 mount되며 Frontend web root에서는 직접 접근할 수 없습니다.
 
 두 서비스는 호스트 포트를 공개하지 않고 외부 Docker 네트워크 `shared-net`에만 연결됩니다.
 Cloudflare Tunnel의 서비스 대상은 `http://modbus-frontend:5173`과

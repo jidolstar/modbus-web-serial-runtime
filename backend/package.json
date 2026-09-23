@@ -5,6 +5,7 @@
   "scripts": {
     "build": "nest build",
     "catalog:import:cwt-th04s": "tsx src/catalogs/import-cwt-th04s.ts",
+    "catalog:assets:audit": "tsx src/catalogs/audit-catalog-assets.ts",
     "db:migrate": "tsx src/database/migrate-cli.ts up",
     "db:migrate:down": "tsx src/database/migrate-cli.ts down",
     "db:migrate:status": "tsx src/database/migrate-cli.ts status",
@@ -14,11 +15,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@modbus-manager/device-catalog-domain": "file:../common/device-catalog-domain",
     "@fastify/cookie": "^11.1.2",
     "@fastify/helmet": "^13.1.1",
+    "@fastify/multipart": "^10.1.2",
     "@fastify/rate-limit": "^11.2.0",
     "@fastify/static": "^10.1.4",
+    "@modbus-manager/device-catalog-domain": "file:../common/device-catalog-domain",
     "@nestjs/common": "^12.0.4",
     "@nestjs/core": "^12.0.4",
     "@nestjs/platform-fastify": "^12.0.4",
@@ -30,11 +32,14 @@
     "mysql2": "^3.24.4",
     "openid-client": "^5.7.1",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "sharp": "^0.35.4",
+    "yauzl": "^3.4.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^12.0.3",
     "@types/node": "^24.3.1",
+    "@types/yauzl": "^3.4.0",
     "tsx": "^4.23.15",
     "typescript": "~5.8.3"
   }
