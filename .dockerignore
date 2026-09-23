@@ -1,0 +1,10 @@
+.git
+.env
+**/node_modules
+**/dist
+_doc
+_plan
+_temp
+temp
+tmp
+.codex

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import catalogBundle from '@modbus-manager/device-catalog-domain/examples/cwt-th04s.bundle.json'
 import catalogIndex from '../../public/device-catalog/index.json'
 import changeBaudRateRecipe from '../../public/device-catalog/cwt-th04s/change-baudrate.recipe.json'
 import changeSlaveIdRecipe from '../../public/device-catalog/cwt-th04s/change-slave-id.recipe.json'
@@ -17,6 +18,8 @@ describe('DeviceProfileValidator', () => {
   const validator = new DeviceProfileValidator()
 
   it('배포되는 CWT-TH04S Profile과 모든 Recipe를 v1 계약으로 인정한다', () => {
+    expect(validator.validateCatalogBundle(catalogBundle, 'cwt-th04s.bundle.json').profile.id)
+      .toBe('cwt-th04s')
     expect(validator.validateCatalogIndex(catalogIndex, 'index.json').profiles).toHaveLength(1)
     expect(validator.validateDeviceProfile(deviceProfile, 'profile.json').id).toBe('cwt-th04s')
 
@@ -28,6 +31,16 @@ describe('DeviceProfileValidator', () => {
     ]) {
       expect(validator.validateRecipe(recipe, `${recipe.id}.json`).id).toBe(recipe.id)
     }
+  })
+
+  it('Bundle의 누락된 Recipe 참조를 저장 전에 거부한다', () => {
+    const invalidBundle = cloneJson(catalogBundle)
+    invalidBundle.recipes = invalidBundle.recipes.filter(
+      (recipe) => recipe.id !== invalidBundle.profile.recipes.probe,
+    )
+
+    expect(() => validator.validateCatalogBundle(invalidBundle, 'broken.bundle.json'))
+      .toThrowError(/존재하지 않는 Recipe를 참조합니다/)
   })
 
   it('지원하지 않는 기본 baudrate를 정확한 JSON 경로와 함께 거부한다', () => {

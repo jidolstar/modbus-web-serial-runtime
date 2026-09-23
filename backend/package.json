@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "scripts": {
     "build": "nest build",
+    "catalog:import:cwt-th04s": "tsx src/catalogs/import-cwt-th04s.ts",
     "db:migrate": "tsx src/database/migrate-cli.ts up",
     "db:migrate:down": "tsx src/database/migrate-cli.ts down",
     "db:migrate:status": "tsx src/database/migrate-cli.ts status",
@@ -13,6 +14,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@modbus-manager/device-catalog-domain": "file:../common/device-catalog-domain",
     "@fastify/cookie": "^11.1.2",
     "@fastify/helmet": "^13.1.1",
     "@fastify/rate-limit": "^11.2.0",
@@ -21,6 +23,8 @@
     "@nestjs/core": "^12.0.4",
     "@nestjs/platform-fastify": "^12.0.4",
     "@nestjs/swagger": "^12.0.1",
+    "ajv": "^8.20.0",
+    "fastify": "^5.12.5",
     "jose": "^5.10.0",
     "kysely": "^0.29.6",
     "mysql2": "^3.24.4",

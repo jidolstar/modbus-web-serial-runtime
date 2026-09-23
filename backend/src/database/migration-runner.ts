@@ -8,6 +8,7 @@ import {
 } from 'kysely/migration'
 import { DatabaseSchema } from './database.types'
 import { initialSchemaMigration } from './migrations/20260922_001_initial-schema'
+import { deviceCatalogsMigration } from './migrations/20260923_002-device-catalogs'
 
 const MIGRATION_LOCK_NAME = 'modbus_manager_migrations'
 const MIGRATION_LOCK_TIMEOUT_SECONDS = 30
@@ -16,6 +17,7 @@ class StaticMigrationProvider implements MigrationProvider {
   async getMigrations(): Promise<Record<string, Migration>> {
     return {
       '20260922_001_initial-schema': initialSchemaMigration,
+      '20260923_002-device-catalogs': deviceCatalogsMigration,
     }
   }
 }

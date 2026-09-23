@@ -10,8 +10,8 @@ import {
   RecipeStepType,
 } from './recipe.types'
 import catalogIndexSchema from './schemas/catalog-index.schema.json'
-import deviceProfileSchema from './schemas/device-profile.schema.json'
-import recipeSchema from './schemas/recipe.schema.json'
+import deviceProfileSchema from '@modbus-manager/device-catalog-domain/schemas/device-profile.schema.json'
+import recipeSchema from '@modbus-manager/device-catalog-domain/schemas/recipe.schema.json'
 
 /** enum과 JSON Schema 배열을 순서와 무관하게 비교하기 위해 정렬한다. */
 function sorted(values: ReadonlyArray<string | number>): Array<string | number> {

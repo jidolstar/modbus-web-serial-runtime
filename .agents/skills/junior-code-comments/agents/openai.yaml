@@ -1,0 +1,4 @@
+interface:
+  display_name: "Junior Code Comments"
+  short_description: "주니어 개발자가 이해할 수 있는 코드 주석 작성"
+  default_prompt: "코드의 의존 관계, 사용처, 목적과 예시값을 한국어 주석으로 명확히 설명해 주세요."

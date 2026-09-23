@@ -18,6 +18,10 @@ describe('Swagger integration', { skip: !runIntegrationTests }, () => {
       '/api/auth/google/callback',
       '/api/auth/me',
       '/api/auth/logout',
+      '/api/catalogs',
+      '/api/catalogs/validate',
+      '/api/catalogs/{catalogKey}',
+      '/api/catalogs/{catalogKey}/status',
     ]) {
       assert.match(document, new RegExp(`"${path.replaceAll('/', '\\/')}"`))
     }

@@ -1,0 +1,208 @@
+{
+  "bundleVersion": "1.0",
+  "profile": {
+    "schemaVersion": "1.0",
+    "id": "cwt-th04s",
+    "manufacturer": "CWT",
+    "model": "CWT-TH04S",
+    "serial": {
+      "default": {
+        "baudRate": 4800,
+        "dataBits": 8,
+        "stopBits": 1,
+        "parity": "none",
+        "flowControl": "none"
+      },
+      "supportedBaudRates": [
+        2400,
+        4800,
+        9600
+      ]
+    },
+    "slave": {
+      "defaultId": 1,
+      "minId": 1,
+      "maxId": 247
+    },
+    "recipes": {
+      "probe": "cwt-th04s.probe",
+      "measurements": [
+        "cwt-th04s.read-measurement"
+      ],
+      "changeSlaveId": "cwt-th04s.change-slave-id",
+      "changeBaudRate": "cwt-th04s.change-baudrate"
+    },
+    "maps": {
+      "baud-rate": {
+        "2400": 0,
+        "4800": 1,
+        "9600": 2
+      }
+    }
+  },
+  "recipes": [
+    {
+      "schemaVersion": "1.0",
+      "id": "cwt-th04s.probe",
+      "name": "CWT-TH04S 존재 확인",
+      "kind": "probe",
+      "parameters": [
+        {
+          "name": "deviceId",
+          "label": "현재 Slave ID",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 247
+        }
+      ],
+      "steps": [
+        {
+          "id": "read-measurement-registers",
+          "type": "readHoldingRegisters",
+          "slaveId": "${deviceId}",
+          "address": 0,
+          "count": 2,
+          "saveAs": "probeRegisters"
+        }
+      ],
+      "onError": "stop"
+    },
+    {
+      "schemaVersion": "1.0",
+      "id": "cwt-th04s.read-measurement",
+      "name": "CWT-TH04S 온습도 읽기",
+      "kind": "measurement",
+      "parameters": [
+        {
+          "name": "deviceId",
+          "label": "현재 Slave ID",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 247
+        }
+      ],
+      "steps": [
+        {
+          "id": "read-measurement-registers",
+          "type": "readHoldingRegisters",
+          "slaveId": "${deviceId}",
+          "address": 0,
+          "count": 2,
+          "saveAs": "measurementRegisters"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "humidity",
+          "source": "measurementRegisters[0]",
+          "decoder": "uint16",
+          "scale": 0.1,
+          "unit": "%RH"
+        },
+        {
+          "name": "temperature",
+          "source": "measurementRegisters[1]",
+          "decoder": "int16",
+          "scale": 0.1,
+          "unit": "°C"
+        }
+      ],
+      "onError": "stop"
+    },
+    {
+      "schemaVersion": "1.0",
+      "id": "cwt-th04s.change-slave-id",
+      "name": "CWT-TH04S Slave ID 변경",
+      "kind": "configuration",
+      "parameters": [
+        {
+          "name": "currentId",
+          "label": "현재 Slave ID",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 247
+        },
+        {
+          "name": "targetId",
+          "label": "변경할 Slave ID",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 247
+        }
+      ],
+      "steps": [
+        {
+          "id": "write-new-slave-id",
+          "type": "writeSingleRegister",
+          "slaveId": "${currentId}",
+          "address": 2000,
+          "value": "${targetId}"
+        },
+        {
+          "id": "wait-for-id-application",
+          "type": "delay",
+          "milliseconds": 300
+        },
+        {
+          "id": "verify-new-slave-id",
+          "type": "probe",
+          "slaveId": "${targetId}"
+        }
+      ],
+      "onError": "stop"
+    },
+    {
+      "schemaVersion": "1.0",
+      "id": "cwt-th04s.change-baudrate",
+      "name": "CWT-TH04S Baudrate 변경",
+      "kind": "configuration",
+      "parameters": [
+        {
+          "name": "deviceId",
+          "label": "현재 Slave ID",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 247
+        },
+        {
+          "name": "targetBaud",
+          "label": "변경할 Baudrate",
+          "type": "enum",
+          "values": [
+            2400,
+            4800,
+            9600
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "id": "write-new-baudrate",
+          "type": "writeSingleRegister",
+          "slaveId": "${deviceId}",
+          "address": 2001,
+          "value": {
+            "map": "baud-rate",
+            "key": "${targetBaud}"
+          }
+        },
+        {
+          "id": "wait-for-baud-application",
+          "type": "delay",
+          "milliseconds": 300
+        },
+        {
+          "id": "reopen-at-new-baudrate",
+          "type": "reopenSerial",
+          "baudRate": "${targetBaud}"
+        },
+        {
+          "id": "verify-new-baudrate",
+          "type": "probe",
+          "slaveId": "${deviceId}"
+        }
+      ],
+      "onError": "stop"
+    }
+  ]
+}

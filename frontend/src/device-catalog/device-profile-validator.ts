@@ -1,7 +1,12 @@
 import Ajv, { type ErrorObject, type ValidateFunction } from 'ajv'
+import {
+  type CatalogBundle,
+  validateCatalogBundleReferences,
+} from '@modbus-manager/device-catalog-domain'
+import catalogBundleSchema from '@modbus-manager/device-catalog-domain/schemas/catalog-bundle.schema.json'
+import deviceProfileSchema from '@modbus-manager/device-catalog-domain/schemas/device-profile.schema.json'
+import recipeSchema from '@modbus-manager/device-catalog-domain/schemas/recipe.schema.json'
 import catalogIndexSchema from './schemas/catalog-index.schema.json'
-import deviceProfileSchema from './schemas/device-profile.schema.json'
-import recipeSchema from './schemas/recipe.schema.json'
 import { DeviceCatalogValidationError } from './catalog-errors'
 import type { DeviceCatalogIndex } from './catalog.types'
 import type { DeviceProfile } from './device-profile.types'
@@ -24,14 +29,18 @@ function formatSchemaErrors(sourceName: string, errors: ErrorObject[] | null | u
  */
 export class DeviceProfileValidator {
   readonly #validateCatalogIndex: ValidateFunction<DeviceCatalogIndex>
+  readonly #validateCatalogBundle: ValidateFunction<CatalogBundle>
   readonly #validateDeviceProfile: ValidateFunction<DeviceProfile>
   readonly #validateRecipe: ValidateFunction<Recipe>
 
   public constructor() {
     const ajv = new Ajv({ allErrors: true, strict: true })
+    ajv.addSchema(deviceProfileSchema)
+    ajv.addSchema(recipeSchema)
     this.#validateCatalogIndex = ajv.compile<DeviceCatalogIndex>(catalogIndexSchema)
-    this.#validateDeviceProfile = ajv.compile<DeviceProfile>(deviceProfileSchema)
-    this.#validateRecipe = ajv.compile<Recipe>(recipeSchema)
+    this.#validateDeviceProfile = ajv.getSchema<DeviceProfile>('device-profile.schema.json')!
+    this.#validateRecipe = ajv.getSchema<Recipe>('recipe.schema.json')!
+    this.#validateCatalogBundle = ajv.compile<CatalogBundle>(catalogBundleSchema)
   }
 
   /** Catalog index JSON을 검증하고 안전한 타입으로 반환한다. */
@@ -39,6 +48,22 @@ export class DeviceProfileValidator {
     if (!this.#validateCatalogIndex(candidate)) {
       throw new DeviceCatalogValidationError(
         formatSchemaErrors(sourceName, this.#validateCatalogIndex.errors),
+      )
+    }
+    return candidate
+  }
+
+  /** DB 등록 단위인 Bundle의 구조와 Profile–Recipe 참조를 함께 검증한다. */
+  public validateCatalogBundle(candidate: unknown, sourceName: string): CatalogBundle {
+    if (!this.#validateCatalogBundle(candidate)) {
+      throw new DeviceCatalogValidationError(
+        formatSchemaErrors(sourceName, this.#validateCatalogBundle.errors),
+      )
+    }
+    const issues = validateCatalogBundleReferences(candidate)
+    if (issues.length > 0) {
+      throw new DeviceCatalogValidationError(
+        issues.map(({ path, message }) => `${sourceName}${path}: ${message}`).join('; '),
       )
     }
     return candidate

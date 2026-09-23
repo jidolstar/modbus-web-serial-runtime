@@ -1,11 +1,12 @@
 FROM node:22-alpine AS development
 
-WORKDIR /app
+WORKDIR /workspace/backend
 
-COPY package*.json ./
+COPY common/device-catalog-domain /workspace/common/device-catalog-domain
+COPY backend/package*.json ./
 RUN npm ci
 
-COPY . .
+COPY backend .
 
 EXPOSE 3000
 

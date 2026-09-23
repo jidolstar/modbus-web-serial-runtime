@@ -4,7 +4,7 @@
 
 표준적인 Modbus 장비는 실행 엔진이 지원하는 Step과 decoder 범위 안에서 JSON Profile/Recipe 등록만으로 추가하는 것을 목표로 합니다. 새로운 프로토콜 기능이 실제로 필요할 때만 실행 엔진을 확장합니다.
 
-현재 CWT-TH04S 온습도 센서의 측정, 장치 탐색 기반, Slave ID 및 baudrate 변경 workflow를 구현했습니다. Backend는 현재 health endpoint만 제공하며 인증, 데이터베이스와 장비 관리 API는 후속 단계입니다.
+현재 CWT-TH04S 온습도 센서의 측정, 장치 탐색 기반, Slave ID 및 baudrate 변경 workflow를 구현했습니다. Backend는 Google 인증과 서버 세션, MySQL migration, DB 기반 장비 Catalog 검증·관리 API를 제공합니다. Catalog 관리 UI와 API 기반 실행 전환은 후속 단계입니다.
 
 ## 설계 원칙
 
@@ -16,7 +16,9 @@ Browser / Frontend
   └─ 측정, Scan, 장비 설정 workflow
 
 Backend
-  └─ 인증, 권한, 영속화와 관리 API (구축 예정)
+  ├─ Google 인증과 서버 관리형 세션
+  ├─ Catalog JSON 검증과 관리 API
+  └─ MySQL 영속화와 migration
 
 MySQL
   └─ 사용자, 세션, 장비 메타데이터 (연동 예정)
@@ -36,6 +38,7 @@ USB Serial 통신은 사용자의 브라우저에서 실행됩니다. Docker con
 │  ├─ src/application/      측정, Scan과 장비 설정 workflow
 │  └─ public/device-catalog 장비별 Profile/Recipe JSON
 ├─ backend/                 NestJS/Fastify API 기반
+├─ common/                  양쪽에서 사용하는 공개 Catalog 계약과 Schema
 ├─ docker/                  개발용 Docker Compose
 ├─ .agents/skills/          저장소 전용 Codex/agent 작업 지침
 ├─ AGENTS.md                공통 개발 원칙
@@ -73,7 +76,7 @@ Cloudflare Tunnel의 서비스 대상은 `http://modbus-frontend:5173`과
 
 Profile과 Recipe 작성 방법은 [Device Catalog 등록 안내](frontend/public/device-catalog/README.md)를 참고합니다.
 
-지원 중인 Step과 decoder로 표현할 수 있는 장비는 Frontend TypeScript를 수정하지 않고 Catalog 파일을 추가해 등록할 수 있습니다.
+지원 중인 Step과 decoder로 표현할 수 있는 장비는 `CatalogBundle v1` JSON으로 서버 검증 후 DB에 등록할 수 있습니다. Frontend 실행은 관리 UI가 완성될 때까지 기존 정적 Catalog도 함께 사용합니다.
 
 ## 개발 원칙
 
