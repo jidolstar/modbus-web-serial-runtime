@@ -2,7 +2,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { DynamicDeviceRuntime, type DeviceRuntimeSnapshot } from '../../application/dynamic-device-runtime'
 import { RUNTIME_CONFIG } from '../../application/runtime-config'
 import { SensorMonitor } from '../../application/sensor-monitor'
-import { JsonDeviceCatalog } from '../../device-catalog/json-device-catalog'
+import { ApiDeviceCatalog } from '../../device-catalog/api-device-catalog'
 import { ModbusRtuClient } from '../../modbus/modbus-rtu-client'
 import { ModbusFrameDirection } from '../../modbus/modbus-types'
 import { RecipeExecutor } from '../../recipe-engine/recipe-executor'
@@ -62,8 +62,8 @@ export function useCwtTh04sRuntime() {
     RUNTIME_CONFIG.modbusTransactionTimeoutMs,
   )
 
-  /** 정적 HTTP 경로의 Profile/Recipe를 검증해 제공하는 Catalog다. */
-  const deviceCatalog = new JsonDeviceCatalog()
+  /** Backend의 활성 Profile/Recipe snapshot을 검증해 제공하는 Runtime Catalog다. */
+  const deviceCatalog = new ApiDeviceCatalog()
 
   /** Catalog Recipe를 제한된 Step 집합으로 실행하는 generic 실행기다. */
   const recipeExecutor = new RecipeExecutor(deviceCatalog, modbusClient, serialTransport)

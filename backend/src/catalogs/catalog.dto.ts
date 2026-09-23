@@ -60,3 +60,13 @@ export class CatalogErrorResponseDto {
   @ApiProperty({ example: 'CATALOG_INVALID_INPUT' }) code!: string // 안정적인 공개 오류 코드
   @ApiPropertyOptional({ type: [String], example: ['/definition/profile/id'], description: '수정 가능한 공개 입력 경로이며 내부 오류는 포함하지 않습니다.' }) fields?: string[] // 오류 입력 경로
 }
+
+export class RuntimeCatalogItemDto {
+  @ApiProperty({ example: 'example-temperature-sensor' }) catalogKey!: string // Profile ID와 같은 실행 key
+  @ApiProperty({ example: 3, minimum: 1 }) revision!: number // 실행 중 고정할 정의 revision
+  @ApiProperty({ type: 'object', additionalProperties: true, example: CATALOG_BUNDLE_EXAMPLE }) definition!: object // 검증 완료 CatalogBundle
+}
+
+export class RuntimeCatalogSnapshotDto {
+  @ApiProperty({ type: [RuntimeCatalogItemDto] }) items!: RuntimeCatalogItemDto[] // 활성 Catalog 전체 snapshot
+}

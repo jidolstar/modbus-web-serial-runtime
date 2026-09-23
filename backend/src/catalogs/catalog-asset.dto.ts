@@ -21,7 +21,7 @@ export class CatalogFileDto {
 
 export class CatalogLinkWriteDto {
   @ApiProperty({ example: '제조사 제품 페이지', maxLength: 160 }) title!: string // 사람이 읽는 링크 제목
-  @ApiProperty({ enum: CATALOG_LINK_TYPES, example: 'official_website' }) linkType!: string // 링크 용도 enum
+  @ApiProperty({ enum: CATALOG_LINK_TYPES, example: 'retailer', description: '링크 용도. retailer는 온라인 쇼핑몰 또는 오프라인 판매처를 뜻합니다.' }) linkType!: string // 링크 용도 enum
   @ApiProperty({ example: 'https://example.com/products/temp-100', maxLength: 2048 }) url!: string // 저장만 하는 public HTTPS URL
 }
 

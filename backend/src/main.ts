@@ -9,6 +9,7 @@ import { AppModule } from './app.module'
 import { AppConfig } from './config/app-config'
 import { APP_CONFIG } from './config/config.module'
 import { HttpExceptionFilter } from './http-exception.filter'
+import { CORS_ALLOWED_METHODS } from './security/cors-policy'
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -19,7 +20,11 @@ async function bootstrap(): Promise<void> {
   const config = app.get<AppConfig>(APP_CONFIG)
 
   await app.register(cookie)
-  await app.register(helmet)
+  await app.register(helmet, {
+    // Frontend와 API가 서로 다른 HTTPS subdomain이므로 exact-origin CORS를 통과한 응답은 Browser가 읽을 수 있어야 한다.
+    // 인증·Origin 검사는 그대로 유지하며 wildcard CORS를 사용하지 않는다.
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
   await app.register(rateLimit, {
     global: false,
   })
@@ -34,6 +39,8 @@ async function bootstrap(): Promise<void> {
       callback(null, !origin || origin === config.corsOrigin)
     },
     credentials: true,
+    // Nest 기본값은 GET/HEAD/POST뿐이므로 Catalog의 PUT/PATCH/DELETE preflight를 명시적으로 허용한다.
+    methods: [...CORS_ALLOWED_METHODS],
   })
 
   const swaggerConfig = new DocumentBuilder()

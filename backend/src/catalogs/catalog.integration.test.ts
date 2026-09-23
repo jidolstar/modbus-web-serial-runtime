@@ -75,6 +75,11 @@ describe('Catalog API integration', { skip: !runDatabaseTests }, () => {
         (({ enabled, revision }) => ({ enabled, revision }))(await disabled.json() as { enabled: boolean; revision: number }),
         { enabled: false, revision: 3 },
       )
+
+      const runtimeSnapshot = await fetch(`http://127.0.0.1:${config.port}/api/runtime/catalog`, { headers: authenticatedHeaders })
+      assert.equal(runtimeSnapshot.status, 200)
+      const runtimeItems = (await runtimeSnapshot.json() as { items: Array<{ catalogKey: string }> }).items
+      assert.equal(runtimeItems.some((item) => item.catalogKey === catalogKey), false)
     } finally {
       await database.deleteFrom('catalog').where('catalog_key', '=', catalogKey).execute()
       await database.deleteFrom('users').where('google_subject', '=', googleSubject).execute()

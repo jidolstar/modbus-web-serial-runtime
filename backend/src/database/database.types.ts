@@ -42,7 +42,7 @@ export interface CatalogsTable {
 
 export type CatalogDocumentType = 'communication_protocol' | 'manual' | 'datasheet' | 'reference_image' | 'other'
 export type CatalogFileStatus = 'pending' | 'clean' | 'rejected' | 'failed'
-export type CatalogLinkType = 'official_website' | 'manufacturer_page' | 'documentation' | 'reference'
+export type CatalogLinkType = 'official_website' | 'manufacturer_page' | 'documentation' | 'reference' | 'retailer'
 
 /** Catalog 목록·상세에 표시할 300×300 JPEG 한 개의 저장 metadata다. */
 export interface CatalogThumbnailsTable {

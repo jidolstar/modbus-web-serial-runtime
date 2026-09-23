@@ -8,7 +8,7 @@ export const CATALOG_LINK_URL_MAX_LENGTH = 2_048 // HTTPS 참고 URL 최대 길�
 export const CATALOG_ORIGINAL_NAME_MAX_LENGTH = 255 // 경로 제거 후 보관할 원본 파일명 최대 길이. 예: 255자
 
 export const CATALOG_DOCUMENT_TYPES = ['communication_protocol', 'manual', 'datasheet', 'reference_image', 'other'] as const
-export const CATALOG_LINK_TYPES = ['official_website', 'manufacturer_page', 'documentation', 'reference'] as const
+export const CATALOG_LINK_TYPES = ['official_website', 'manufacturer_page', 'documentation', 'reference', 'retailer'] as const
 
 export const CATALOG_ERROR_CODES = Object.freeze({
   invalidInput: 'CATALOG_INVALID_INPUT', // DTO 또는 JSON Schema 검증 실패. 예: title 누락

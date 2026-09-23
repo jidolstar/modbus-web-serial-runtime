@@ -75,6 +75,11 @@ export class CatalogRepository {
     return this.database.selectFrom('catalog').selectAll().where('catalog_key', '=', catalogKey).executeTakeFirst()
   }
 
+  /** Runtime snapshot API가 활성 정의만 안정 key 순서로 읽어 재현 가능한 응답을 만들 때 사용한다. */
+  public listEnabled(): Promise<CatalogRow[]> {
+    return this.database.selectFrom('catalog').selectAll().where('enabled', '=', true).orderBy('catalog_key', 'asc').execute()
+  }
+
   private findById(id: number): Promise<CatalogRow | undefined> {
     return this.database.selectFrom('catalog').selectAll().where('id', '=', id).executeTakeFirst()
   }

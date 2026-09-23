@@ -22,6 +22,12 @@ export interface CatalogDetail extends CatalogSummary {
   readonly definition: CatalogBundle // 검증되어 DB에 저장된 전체 Bundle
 }
 
+export interface RuntimeCatalogItem {
+  readonly catalogKey: string // Profile ID와 동일한 실행 Catalog key. 예: "example-temperature-sensor"
+  readonly revision: number // 실행 시작 시 고정할 snapshot revision. 예: 3
+  readonly definition: CatalogBundle // 서버 검증 후 저장된 Profile과 전체 Recipe
+}
+
 function isDuplicateKeyError(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ER_DUP_ENTRY'
 }
@@ -63,6 +69,18 @@ export class CatalogService {
   /** 상세 endpoint에서 catalogKey에 해당하는 전체 검증 Bundle을 반환한다. */
   public async get(catalogKey: string): Promise<CatalogDetail> {
     return this.toDetail(await this.requireCatalog(catalogKey))
+  }
+
+  /** Runtime Catalog endpoint에서 비활성 정의를 제외한 검증 완료 snapshot을 반환한다. */
+  public async getRuntimeSnapshot(): Promise<{ readonly items: RuntimeCatalogItem[] }> {
+    const rows = await this.repository.listEnabled()
+    return {
+      items: rows.map((row) => ({
+        catalogKey: row.catalog_key,
+        revision: row.revision,
+        definition: this.parseStoredDefinition(row.definition_json),
+      })),
+    }
   }
 
   /** 전체 수정 endpoint에서 URL key 변경과 오래된 revision 덮어쓰기를 모두 차단한다. */

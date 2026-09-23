@@ -9,6 +9,7 @@ describe('Swagger integration', { skip: !runIntegrationTests }, () => {
     const config = loadAppConfig()
     const response = await fetch(`http://127.0.0.1:${config.port}/api/docs-json`)
     assert.equal(response.status, 200)
+    assert.equal(response.headers.get('cross-origin-resource-policy'), 'cross-origin')
 
     const document = await response.text()
     for (const path of [
@@ -27,6 +28,7 @@ describe('Swagger integration', { skip: !runIntegrationTests }, () => {
       '/api/catalogs/{catalogKey}/files/{fileId}/download',
       '/api/catalogs/{catalogKey}/links',
       '/api/catalogs/{catalogKey}/links/{linkId}',
+      '/api/runtime/catalog',
     ]) {
       assert.match(document, new RegExp(`"${path.replaceAll('/', '\\/')}"`))
     }

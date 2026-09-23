@@ -9,8 +9,9 @@ const SOURCE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 /** 상위 계층이 의존할 수 있는 동일/하위 계층 목록이다. */
 const ALLOWED_LAYER_DEPENDENCIES: Readonly<Record<string, ReadonlyArray<string>>> = Object.freeze({
   serial: ['serial'],
+  http: ['http'],
   modbus: ['modbus', 'serial'],
-  'device-catalog': ['device-catalog', 'serial'],
+  'device-catalog': ['device-catalog', 'serial', 'http'],
   'recipe-engine': ['recipe-engine', 'device-catalog', 'modbus', 'serial'],
   application: ['application', 'device-catalog', 'recipe-engine', 'modbus', 'serial'],
   features: ['features', 'application', 'device-catalog', 'recipe-engine', 'modbus', 'serial'],

@@ -8,6 +8,7 @@ describe('Catalog asset input', () => {
     assert.deepEqual(parseCatalogLinkInput({ title: '제품 페이지', linkType: 'official_website', url: 'https://example.com/product' }), {
       title: '제품 페이지', linkType: 'official_website', url: 'https://example.com/product',
     })
+    assert.equal(parseCatalogLinkInput({ title: '공식 판매처', linkType: 'retailer', url: 'https://shop.example.com/product' }).linkType, 'retailer')
   })
 
   it('rejects credential, HTTP, localhost and IP links', () => {
@@ -21,5 +22,9 @@ describe('Catalog asset input', () => {
       title: '통신 규격', documentType: 'communication_protocol',
     })
     assert.throws(() => parseCatalogFileFields({ title: '문서', documentType: 'executable' }), CatalogError)
+  })
+
+  it('rejects an unknown link type', () => {
+    assert.throws(() => parseCatalogLinkInput({ title: '알 수 없는 유형', linkType: 'marketplace', url: 'https://example.com/product' }), CatalogError)
   })
 })
