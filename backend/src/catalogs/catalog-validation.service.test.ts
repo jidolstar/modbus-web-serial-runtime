@@ -36,4 +36,24 @@ describe('CatalogValidationService', () => {
     invalidBundle.profile.recipes.probe = 'legacy.probe'
     assert.throws(() => validator.validate(invalidBundle), CatalogError)
   })
+
+  it('accepts an after-power-cycle configuration Recipe', () => {
+    const validBundle = cloneJson(catalogBundle) as unknown as {
+      recipes: Array<{ kind: string; applyMode?: string }>
+    }
+    const configurationRecipe = validBundle.recipes.find(({ kind }) => kind === 'configuration')
+    assert.ok(configurationRecipe)
+    configurationRecipe.applyMode = 'after-power-cycle'
+    assert.equal(validator.validate(validBundle).profile.id, 'cwt-th04s')
+  })
+
+  it('rejects after-power-cycle on a measurement Recipe', () => {
+    const invalidBundle = cloneJson(catalogBundle) as unknown as {
+      recipes: Array<{ kind: string; applyMode?: string }>
+    }
+    const measurementRecipe = invalidBundle.recipes.find(({ kind }) => kind === 'measurement')
+    assert.ok(measurementRecipe)
+    measurementRecipe.applyMode = 'after-power-cycle'
+    assert.throws(() => validator.validate(invalidBundle), CatalogError)
+  })
 })

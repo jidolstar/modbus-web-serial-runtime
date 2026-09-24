@@ -78,12 +78,20 @@ class RecordingTransport implements SerialTransport {
 /** 실제 CWT Profile을 제공하는 최소 Catalog다. */
 class ConfiguratorTestCatalog implements DeviceCatalog {
   readonly #validator = new DeviceProfileValidator()
-  readonly #profile = this.#validator.validateDeviceProfile(profileJson, 'profile.json')
-  readonly #recipes = new Map(
-    [changeSlaveIdRecipeJson, changeBaudRateRecipeJson]
+  readonly #profile: DeviceProfile
+  readonly #recipes: Map<string, Recipe>
+
+  public constructor(
+    profileCandidate: unknown = profileJson,
+    recipeCandidates: ReadonlyArray<unknown> = [changeSlaveIdRecipeJson, changeBaudRateRecipeJson],
+  ) {
+    this.#profile = this.#validator.validateDeviceProfile(profileCandidate, 'profile.json')
+    this.#recipes = new Map(
+      recipeCandidates
       .map((recipe, index) => this.#validator.validateRecipe(recipe, `recipe-${index}.json`))
       .map((recipe) => [recipe.id, recipe]),
-  )
+    )
+  }
   public async load(): Promise<void> {}
   public getProfile(): DeviceProfile { return this.#profile }
   public getRecipe(recipeId: string): Recipe {
@@ -185,5 +193,49 @@ describe('DeviceConfigurator', () => {
     expect(result.status).toBe(ConfigurationStatus.DeviceStateUnknown)
     expect(result.currentContext).toBeNull()
     expect(transport.reopenedConfigs.map((config) => config.baudRate)).toEqual([9_600, 4_800])
+  })
+
+  it('전원 재인가형 ID 변경은 새 ID를 확정하지 않고 사용자 조치와 대기 context를 반환한다', async () => {
+    const deferredRecipe = {
+      ...changeSlaveIdRecipeJson,
+      applyMode: 'after-power-cycle',
+      steps: [changeSlaveIdRecipeJson.steps[0]],
+    }
+    const targetNoResponse = recipeFailure('read', new ModbusTimeoutError('no target'))
+    const runner = new ScriptedRecipeRunner([SUCCESS_RESULT, targetNoResponse, SUCCESS_RESULT])
+    const configurator = new DeviceConfigurator(
+      new ConfiguratorTestCatalog(profileJson, [deferredRecipe, changeBaudRateRecipeJson]),
+      runner,
+      new RecordingTransport(),
+    )
+
+    const result = await configurator.changeSlaveId(CURRENT_CONTEXT, 101)
+
+    expect(result.status).toBe(ConfigurationStatus.PowerCycleRequired)
+    expect(result.currentContext).toBe(CURRENT_CONTEXT)
+    expect(result.pendingContext?.slaveId).toBe(101)
+    expect(result.requiredAction).toBe('power-cycle-and-verify')
+  })
+
+  it('전원 재인가형 baud 변경은 port를 다시 열지 않고 목표 baud 확인을 대기시킨다', async () => {
+    const deferredRecipe = {
+      ...changeBaudRateRecipeJson,
+      applyMode: 'after-power-cycle',
+      steps: [changeBaudRateRecipeJson.steps[0]],
+    }
+    const transport = new RecordingTransport()
+    const configurator = new DeviceConfigurator(
+      new ConfiguratorTestCatalog(profileJson, [changeSlaveIdRecipeJson, deferredRecipe]),
+      new ScriptedRecipeRunner([SUCCESS_RESULT, SUCCESS_RESULT]),
+      transport,
+    )
+
+    const result = await configurator.changeBaudRate(CURRENT_CONTEXT, 4_800)
+
+    expect(result.status).toBe(ConfigurationStatus.PowerCycleRequired)
+    expect(result.currentContext).toBe(CURRENT_CONTEXT)
+    expect(result.pendingContext?.serialConfig.baudRate).toBe(4_800)
+    expect(result.requiredAction).toBe('power-cycle-and-verify')
+    expect(transport.reopenedConfigs).toEqual([])
   })
 })

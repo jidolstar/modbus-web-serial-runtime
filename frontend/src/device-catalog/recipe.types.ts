@@ -1,5 +1,6 @@
 export {
   RecipeDecoderType,
+  RecipeApplyMode,
   RecipeErrorPolicy,
   RecipeKind,
   RecipeSchemaVersion,

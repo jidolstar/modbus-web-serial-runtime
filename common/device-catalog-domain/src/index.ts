@@ -6,6 +6,7 @@ export enum CatalogBundleSchemaVersion { Version1 = '1.0' }
 export enum SerialParity { None = 'none', Even = 'even', Odd = 'odd' }
 export enum SerialFlowControl { None = 'none', Hardware = 'hardware' }
 export enum RecipeKind { Measurement = 'measurement', Configuration = 'configuration' }
+export enum RecipeApplyMode { Immediate = 'immediate', AfterPowerCycle = 'after-power-cycle' }
 export enum RecipeStepType {
   ReadHoldingRegisters = 'readHoldingRegisters', WriteSingleRegister = 'writeSingleRegister',
   Delay = 'delay', ReopenSerial = 'reopenSerial', AssertEquals = 'assertEquals',
@@ -66,7 +67,7 @@ export interface ReopenSerialStep extends RecipeStepBase { readonly type: Recipe
 export interface AssertEqualsStep extends RecipeStepBase { readonly type: RecipeStepType.AssertEquals; readonly actual: string; readonly expected: RecipeValue }
 export type RecipeStep = ReadHoldingRegistersStep | WriteSingleRegisterStep | DelayStep | ReopenSerialStep | AssertEqualsStep
 export interface RecipeOutput { readonly name: string; readonly source: string; readonly decoder: RecipeDecoderType; readonly scale?: number; readonly offset?: number; readonly unit?: string }
-export interface Recipe { readonly schemaVersion: RecipeSchemaVersion; readonly id: string; readonly name: string; readonly kind: RecipeKind; readonly parameters?: ReadonlyArray<RecipeParameter>; readonly steps: ReadonlyArray<RecipeStep>; readonly outputs?: ReadonlyArray<RecipeOutput>; readonly onError: RecipeErrorPolicy }
+export interface Recipe { readonly schemaVersion: RecipeSchemaVersion; readonly id: string; readonly name: string; readonly kind: RecipeKind; readonly applyMode?: RecipeApplyMode; readonly parameters?: ReadonlyArray<RecipeParameter>; readonly steps: ReadonlyArray<RecipeStep>; readonly outputs?: ReadonlyArray<RecipeOutput>; readonly onError: RecipeErrorPolicy }
 
 export interface CatalogBundle {
   readonly bundleVersion: CatalogBundleSchemaVersion
@@ -92,6 +93,12 @@ export function validateCatalogBundleReferences(bundle: CatalogBundle): Readonly
   ].filter((id): id is string => id !== undefined)
   for (const recipeId of references) {
     if (!recipesById.has(recipeId)) issues.push({ path: '/profile/recipes', message: `존재하지 않는 Recipe를 참조합니다: ${recipeId}` })
+  }
+
+  for (const [recipeIndex, recipe] of bundle.recipes.entries()) {
+    if (recipe.applyMode === RecipeApplyMode.AfterPowerCycle && recipe.kind !== RecipeKind.Configuration) {
+      issues.push({ path: `/recipes/${recipeIndex}/applyMode`, message: '전원 재인가 적용 방식은 설정 Recipe에만 사용할 수 있습니다.' })
+    }
   }
 
   const extensionCapabilities = (bundle.profile.extensions ?? []).map(({ capability }) => capability)

@@ -1,6 +1,7 @@
 'use strict'
 
 const RecipeKind = Object.freeze({ Measurement: 'measurement', Configuration: 'configuration' })
+const RecipeApplyMode = Object.freeze({ Immediate: 'immediate', AfterPowerCycle: 'after-power-cycle' })
 const RecipeStepType = Object.freeze({ ReadHoldingRegisters: 'readHoldingRegisters', AssertEquals: 'assertEquals' })
 const STANDARD_DEVICE_ID_PARAMETER = 'deviceId'
 
@@ -20,9 +21,14 @@ function validateCatalogBundleReferences(bundle) {
   for (const recipeId of references) {
     if (!recipesById.has(recipeId)) issues.push({ path: '/profile/recipes', message: `존재하지 않는 Recipe를 참조합니다: ${recipeId}` })
   }
+  for (const [recipeIndex, recipe] of bundle.recipes.entries()) {
+    if (recipe.applyMode === RecipeApplyMode.AfterPowerCycle && recipe.kind !== RecipeKind.Configuration) {
+      issues.push({ path: `/recipes/${recipeIndex}/applyMode`, message: '전원 재인가 적용 방식은 설정 Recipe에만 사용할 수 있습니다.' })
+    }
+  }
   const extensionCapabilities = (bundle.profile.extensions || []).map(({ capability }) => capability)
   if (new Set(extensionCapabilities).size !== extensionCapabilities.length) issues.push({ path: '/profile/extensions', message: 'extension capability는 Profile 안에서 고유해야 합니다.' })
   return issues
 }
 
-module.exports = { RecipeKind, RecipeStepType, STANDARD_DEVICE_ID_PARAMETER, validateCatalogBundleReferences }
+module.exports = { RecipeKind, RecipeApplyMode, RecipeStepType, STANDARD_DEVICE_ID_PARAMETER, validateCatalogBundleReferences }

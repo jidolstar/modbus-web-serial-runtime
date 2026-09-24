@@ -3,7 +3,8 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 const PROFILE_EXAMPLE = {
   schemaVersion: '1.0', id: 'example-temperature-sensor', manufacturer: 'Example Devices', model: 'TEMP-100',
   serial: { default: { baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' }, supportedBaudRates: [9600] },
-  slave: { defaultId: 1, minId: 1, maxId: 247 }, recipes: { measurements: ['example-temperature-sensor.read'] },
+  slave: { defaultId: 1, minId: 1, maxId: 247 },
+  recipes: { measurements: ['example-temperature-sensor.read'], changeSlaveId: 'example-temperature-sensor.change-slave-id' },
 }
 const RECIPE_EXAMPLE = {
   schemaVersion: '1.0', id: 'example-temperature-sensor.read', name: '온도 읽기', kind: 'measurement',
@@ -11,7 +12,21 @@ const RECIPE_EXAMPLE = {
   steps: [{ id: 'read-temperature', type: 'readHoldingRegisters', slaveId: '${deviceId}', address: 0, count: 1, saveAs: 'registers' }],
   outputs: [{ name: 'temperature', source: 'registers[0]', decoder: 'int16', scale: 0.1, unit: '°C' }], onError: 'stop',
 }
-export const CATALOG_BUNDLE_EXAMPLE = { bundleVersion: '1.0', profile: PROFILE_EXAMPLE, recipes: [RECIPE_EXAMPLE] }
+const POWER_CYCLE_RECIPE_EXAMPLE = {
+  schemaVersion: '1.0', id: 'example-temperature-sensor.change-slave-id', name: 'Slave ID 변경', kind: 'configuration',
+  applyMode: 'after-power-cycle',
+  parameters: [
+    { name: 'currentId', type: 'integer', minimum: 1, maximum: 247 },
+    { name: 'targetId', type: 'integer', minimum: 1, maximum: 247 },
+  ],
+  steps: [{ id: 'write-slave-id', type: 'writeSingleRegister', slaveId: '${currentId}', address: 16, value: '${targetId}' }],
+  onError: 'stop',
+}
+export const CATALOG_BUNDLE_EXAMPLE = {
+  bundleVersion: '1.0',
+  profile: PROFILE_EXAMPLE,
+  recipes: [RECIPE_EXAMPLE, POWER_CYCLE_RECIPE_EXAMPLE],
+}
 
 export class CatalogWriteRequestDto {
   @ApiProperty({ example: 'Example TEMP-100 온도 센서', maxLength: 160, description: '목록과 검색에 사용하는 사람이 읽기 쉬운 필수 제목입니다.' })

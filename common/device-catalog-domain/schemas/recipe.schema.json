@@ -9,6 +9,10 @@
     "id": { "$ref": "#/definitions/id" },
     "name": { "type": "string", "minLength": 1 },
     "kind": { "enum": ["measurement", "configuration"] },
+    "applyMode": {
+      "enum": ["immediate", "after-power-cycle"],
+      "description": "설정 write가 즉시 적용되는지, 사용자의 물리적 전원 재인가 후 적용되는지 나타냅니다. 생략하면 immediate입니다."
+    },
     "parameters": {
       "type": "array",
       "uniqueItems": true,

@@ -1,5 +1,5 @@
 import type { DeviceCatalog } from '../device-catalog/catalog.types'
-import { RecipeStepType, STANDARD_DEVICE_ID_PARAMETER } from '../device-catalog/recipe.types'
+import { RecipeApplyMode, RecipeStepType, STANDARD_DEVICE_ID_PARAMETER } from '../device-catalog/recipe.types'
 import { ModbusExceptionError, ModbusTimeoutError } from '../modbus/modbus-errors'
 import { RecipeAbortedError, RecipeExecutionError } from '../recipe-engine/recipe-execution-errors'
 import type { RecipeRunner } from '../recipe-engine/recipe-execution.types'
@@ -10,6 +10,7 @@ import { findErrorCause, OperationAbortedError, throwIfOperationAborted } from '
 /** 설정 변경의 검증 수준과 최종 장비 상태를 나타낸다. */
 export enum ConfigurationStatus {
   Verified = 'verified',
+  PowerCycleRequired = 'power-cycle-required',
   WriteFailed = 'write-failed',
   VerificationFailed = 'verification-failed',
   RecoveredOnPreviousConfig = 'recovered-on-previous-config',
@@ -38,6 +39,12 @@ export interface ConfigurationResult {
 
   /** 변경 후 확인된 context이며 상태를 특정할 수 없으면 null이다. */
   readonly currentContext: DeviceContext | null
+
+  /** 전원 재인가 후 확인해야 할 목표 context다. 즉시 적용 장비에서는 생략한다. */
+  readonly pendingContext?: DeviceContext
+
+  /** 사용자가 수행해야 할 물리 작업이다. 예: "power-cycle-and-verify" */
+  readonly requiredAction?: 'power-cycle-and-verify'
 
   /** Recipe가 실패했을 때 마지막으로 실행한 Step ID다. */
   readonly failedStepId?: string
@@ -121,6 +128,7 @@ export class DeviceConfigurator {
       )
     }
 
+    const recipe = this.catalog.getRecipe(recipeId)
     try {
       await this.recipeRunner.execute(
         profile.id,
@@ -128,6 +136,10 @@ export class DeviceConfigurator {
         { [CURRENT_ID_PARAMETER]: currentContext.slaveId, [TARGET_ID_PARAMETER]: targetSlaveId },
         signal,
       )
+      if (recipe.applyMode === RecipeApplyMode.AfterPowerCycle) {
+        // 브라우저는 장비 전원을 제어할 수 없으므로 현재 연결값은 확정하지 않고 사용자 조치로 넘긴다.
+        return this.#powerCycleRequiredResult(currentContext, targetContext)
+      }
       return this.#result(ConfigurationStatus.Verified, currentContext, targetContext)
     } catch (error) {
       this.#throwIfCancelled(error, signal)
@@ -180,6 +192,7 @@ export class DeviceConfigurator {
       ...currentContext,
       serialConfig: Object.freeze({ ...currentContext.serialConfig, baudRate: targetBaudRate }),
     })
+    const recipe = this.catalog.getRecipe(recipeId)
     try {
       await this.recipeRunner.execute(
         profile.id,
@@ -187,6 +200,10 @@ export class DeviceConfigurator {
         { [STANDARD_DEVICE_ID_PARAMETER]: currentContext.slaveId, [TARGET_BAUD_PARAMETER]: targetBaudRate },
         signal,
       )
+      if (recipe.applyMode === RecipeApplyMode.AfterPowerCycle) {
+        // 전원 재인가 전에는 기존 baudrate가 계속 유효하므로 reopen이나 새 설정 검증을 하지 않는다.
+        return this.#powerCycleRequiredResult(currentContext, targetContext)
+      }
       return this.#result(ConfigurationStatus.Verified, currentContext, targetContext)
     } catch (error) {
       this.#throwIfCancelled(error, signal)
@@ -303,6 +320,20 @@ export class DeviceConfigurator {
     failedStepId?: string,
   ): ConfigurationResult {
     return Object.freeze({ status, previousContext, currentContext, error, failedStepId })
+  }
+
+  /** 전원 재인가형 Recipe가 성공했을 때 호출자에게 현재값과 확인 대기값을 함께 돌려준다. */
+  #powerCycleRequiredResult(
+    currentContext: DeviceContext,
+    pendingContext: DeviceContext,
+  ): ConfigurationResult {
+    return Object.freeze({
+      status: ConfigurationStatus.PowerCycleRequired,
+      previousContext: currentContext,
+      currentContext,
+      pendingContext,
+      requiredAction: 'power-cycle-and-verify' as const,
+    })
   }
 
   /** unknown catch 값을 Error로 정규화한다. */
