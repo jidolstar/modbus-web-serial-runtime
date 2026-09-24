@@ -99,6 +99,7 @@ export class JsonDeviceCatalog implements DeviceCatalog {
         ...(profile.recipes.measurements ?? []),
         profile.recipes.changeSlaveId,
         profile.recipes.changeBaudRate,
+        ...(profile.recipes.actions ?? []),
       ].filter((recipeId): recipeId is string => recipeId !== undefined)
 
       for (const recipeId of referencedRecipeIds) {

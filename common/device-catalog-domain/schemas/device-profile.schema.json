@@ -43,7 +43,12 @@
           "items": { "$ref": "#/definitions/id" }
         },
         "changeSlaveId": { "$ref": "#/definitions/id" },
-        "changeBaudRate": { "$ref": "#/definitions/id" }
+        "changeBaudRate": { "$ref": "#/definitions/id" },
+        "actions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/definitions/id" }
+        }
       }
     },
     "maps": {

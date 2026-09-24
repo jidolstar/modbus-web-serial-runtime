@@ -36,6 +36,8 @@ export interface DeviceRecipeReferences {
   readonly measurements?: ReadonlyArray<string>
   readonly changeSlaveId?: string
   readonly changeBaudRate?: string
+  /** 관리자가 테스트 화면에 직접 노출하도록 허용한 설정 Recipe ID 목록이다. */
+  readonly actions?: ReadonlyArray<string>
 }
 
 export interface CatalogCapabilityExtension {
@@ -116,6 +118,7 @@ export function validateCatalogBundleReferences(bundle: CatalogBundle): Readonly
     ...(bundle.profile.recipes.measurements ?? []),
     bundle.profile.recipes.changeSlaveId,
     bundle.profile.recipes.changeBaudRate,
+    ...(bundle.profile.recipes.actions ?? []),
   ].filter((id): id is string => id !== undefined)
   for (const recipeId of references) {
     if (!recipesById.has(recipeId)) issues.push({ path: '/profile/recipes', message: `존재하지 않는 Recipe를 참조합니다: ${recipeId}` })
@@ -155,6 +158,17 @@ export function validateCatalogBundleReferences(bundle: CatalogBundle): Readonly
           || output.format.type === RecipeFormatterType.Boolean && decodedKind === 'boolean'
         if (!compatible) issues.push({ path: `/recipes/${recipeIndex}/outputs/${outputIndex}/format`, message: 'decoder 결과 타입과 formatter 타입이 일치해야 합니다.' })
       }
+    }
+  }
+
+  for (const actionId of bundle.profile.recipes.actions ?? []) {
+    const action = recipesById.get(actionId)
+    if (!action || action.kind !== RecipeKind.Configuration) {
+      issues.push({ path: '/profile/recipes/actions', message: `추가 작업은 configuration Recipe만 참조할 수 있습니다: ${actionId}` })
+      continue
+    }
+    if (!action.steps.some(({ type }) => type === RecipeStepType.WriteSingleRegister)) {
+      issues.push({ path: '/profile/recipes/actions', message: `추가 작업에는 writeSingleRegister Step이 필요합니다: ${actionId}` })
     }
   }
 

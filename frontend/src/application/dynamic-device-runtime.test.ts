@@ -162,4 +162,18 @@ describe('DynamicDeviceRuntime', () => {
     expect(() => runtime.selectMeasurement('unlisted.recipe')).toThrow(/허용하지 않는 측정 Recipe/)
     expect(monitor.starts).toHaveLength(1)
   })
+
+  it('쓰기 작업 동안 polling을 멈추고 변경된 context로 다시 시작한다', async () => {
+    const profile = createProfile()
+    const monitor = new RecordingSensorMonitor()
+    const runtime = new DynamicDeviceRuntime(new RuntimeTestCatalog(profile), new MockSerialTransport(), monitor)
+    await runtime.connect({ profileId: profile.id, slaveId: 1, baudRate: 4800 })
+
+    runtime.pauseMeasurement()
+    runtime.resumeMeasurement({ profileId: profile.id, slaveId: 2, baudRate: 4800 })
+
+    expect(monitor.stopCount).toBeGreaterThan(0)
+    expect(monitor.starts.at(-1)?.parameters).toEqual({ deviceId: 2 })
+    expect(runtime.snapshot.activeDevice?.slaveId).toBe(2)
+  })
 })

@@ -2,7 +2,10 @@
 
 const RecipeKind = Object.freeze({ Measurement: 'measurement', Configuration: 'configuration' })
 const RecipeApplyMode = Object.freeze({ Immediate: 'immediate', AfterPowerCycle: 'after-power-cycle' })
-const RecipeStepType = Object.freeze({ ReadHoldingRegisters: 'readHoldingRegisters', AssertEquals: 'assertEquals' })
+const RecipeStepType = Object.freeze({
+  ReadHoldingRegisters: 'readHoldingRegisters', WriteSingleRegister: 'writeSingleRegister',
+  Delay: 'delay', ReopenSerial: 'reopenSerial', AssertEquals: 'assertEquals',
+})
 const RecipeSchemaVersion = Object.freeze({ Version1: '1.0', Version2: '2.0' })
 const RecipeDecoderType = Object.freeze({ Unsigned16: 'uint16', Signed16: 'int16', Unsigned32: 'uint32', Signed32: 'int32', Float32: 'float32', Float64: 'float64', Bit: 'bit', Ascii: 'ascii', Hex: 'hex' })
 const STANDARD_DEVICE_ID_PARAMETER = 'deviceId'
@@ -19,9 +22,20 @@ function validateCatalogBundleReferences(bundle) {
     ...(bundle.profile.recipes.measurements || []),
     bundle.profile.recipes.changeSlaveId,
     bundle.profile.recipes.changeBaudRate,
+    ...(bundle.profile.recipes.actions || []),
   ].filter((id) => id !== undefined)
   for (const recipeId of references) {
     if (!recipesById.has(recipeId)) issues.push({ path: '/profile/recipes', message: `존재하지 않는 Recipe를 참조합니다: ${recipeId}` })
+  }
+  for (const actionId of (bundle.profile.recipes.actions || [])) {
+    const action = recipesById.get(actionId)
+    if (!action || action.kind !== RecipeKind.Configuration) {
+      issues.push({ path: '/profile/recipes/actions', message: `추가 작업은 configuration Recipe만 참조할 수 있습니다: ${actionId}` })
+      continue
+    }
+    if (!action.steps.some(({ type }) => type === RecipeStepType.WriteSingleRegister)) {
+      issues.push({ path: '/profile/recipes/actions', message: `추가 작업에는 writeSingleRegister Step이 필요합니다: ${actionId}` })
+    }
   }
   for (const [recipeIndex, recipe] of bundle.recipes.entries()) {
     if (recipe.applyMode === RecipeApplyMode.AfterPowerCycle && recipe.kind !== RecipeKind.Configuration) {

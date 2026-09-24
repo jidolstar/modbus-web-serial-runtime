@@ -121,6 +121,22 @@ export class DynamicDeviceRuntime {
     this.#startMeasurement(profile.id, measurementRecipeId, activeDevice.slaveId)
   }
 
+  /** 설정·쓰기 작업과 polling transaction이 섞이지 않도록 현재 측정만 잠시 멈춘다. */
+  public pauseMeasurement(): void {
+    this.sensorMonitor.stop()
+  }
+
+  /** 작업 종료 후 현재 연결값과 선택 Recipe로 polling을 다시 시작한다. */
+  public resumeMeasurement(request?: DeviceConnectionRequest): void {
+    const activeDevice = request ?? this.#snapshot.activeDevice
+    const recipeId = this.#snapshot.activeMeasurementRecipeId
+    if (this.#snapshot.connectionState !== SerialConnectionState.Connected || !activeDevice || !recipeId) return
+    const profile = this.catalog.getProfile(activeDevice.profileId)
+    this.#validateConnectionRequest(profile, activeDevice)
+    this.#updateSnapshot({ activeDevice, error: null })
+    this.#startMeasurement(activeDevice.profileId, recipeId, activeDevice.slaveId)
+  }
+
   /** polling을 먼저 중단한 뒤 사용자의 정상 종료 사유로 port를 닫는다. */
   public async disconnect(): Promise<void> {
     this.sensorMonitor.stop()

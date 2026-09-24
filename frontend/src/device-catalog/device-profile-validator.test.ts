@@ -66,4 +66,16 @@ describe('DeviceProfileValidator', () => {
     ;(legacyProfile.recipes as Record<string, unknown>).probe = 'legacy.probe'
     expect(() => validator.validateDeviceProfile(legacyProfile, 'legacy-profile.json')).toThrowError(/additional properties/)
   })
+
+  it('actions는 write가 포함된 configuration Recipe만 허용한다', () => {
+    const invalidBundle = cloneJson(catalogBundle) as unknown as { profile: { recipes: { actions: string[] } }; recipes: Array<{ id: string }> }
+    invalidBundle.profile.recipes.actions = [invalidBundle.recipes[0].id]
+    expect(() => validator.validateCatalogBundle(invalidBundle, 'action.bundle.json')).toThrow(/configuration Recipe/)
+  })
+
+  it('write가 포함된 configuration Recipe는 추가 작업으로 공개할 수 있다', () => {
+    const validBundle = cloneJson(catalogBundle) as unknown as { profile: { recipes: { actions: string[]; changeSlaveId: string } } }
+    validBundle.profile.recipes.actions = [validBundle.profile.recipes.changeSlaveId]
+    expect(validator.validateCatalogBundle(validBundle, 'action.bundle.json').profile.recipes.actions).toHaveLength(1)
+  })
 })

@@ -69,4 +69,16 @@ describe('CatalogValidationService', () => {
     invalidBundle.recipes[0].outputs![0].format = { type: 'text' }
     assert.throws(() => validator.validate(invalidBundle), CatalogError)
   })
+
+  it('추가 작업 allowlist가 measurement Recipe를 공개하면 거부한다', () => {
+    const invalidBundle = cloneJson(catalogBundle) as unknown as { profile: { recipes: { actions: string[]; measurements: string[] } } }
+    invalidBundle.profile.recipes.actions = [invalidBundle.profile.recipes.measurements[0]]
+    assert.throws(() => validator.validate(invalidBundle), CatalogError)
+  })
+
+  it('write configuration Recipe를 추가 작업 allowlist로 저장할 수 있다', () => {
+    const validBundle = cloneJson(catalogBundle) as unknown as { profile: { recipes: { actions: string[]; changeSlaveId: string } } }
+    validBundle.profile.recipes.actions = [validBundle.profile.recipes.changeSlaveId]
+    assert.equal(validator.validate(validBundle).profile.recipes.actions?.length, 1)
+  })
 })

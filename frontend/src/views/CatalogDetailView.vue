@@ -20,6 +20,11 @@ const links = ref<CatalogLinkItem[]>([])
 const thumbnailUrl = ref<string | null>(null)
 const extensions = computed(() => detail.value?.definition.profile.extensions ?? [])
 const formatters = computed(() => detail.value ? summarizeCatalogFormatters(detail.value.definition) : [])
+const exposedActions = computed(() => {
+  if (!detail.value) return []
+  const recipes = new Map(detail.value.definition.recipes.map((recipe) => [recipe.id, recipe]))
+  return (detail.value.definition.profile.recipes.actions ?? []).map((id) => recipes.get(id)).filter((recipe) => recipe !== undefined)
+})
 const testDeviceModalOpen = ref(false)
 
 function openTestDevice(device: TestDevice): void {
@@ -80,6 +85,7 @@ onBeforeUnmount(() => { if (thumbnailUrl.value) URL.revokeObjectURL(thumbnailUrl
         <section class="surface-card detail-section"><div class="section-heading"><div><h2 class="help-label">CatalogBundle JSON <HelpTooltip label="CatalogBundle JSON" :text="HELP_TOOLTIP_COPY.catalogBundle" /></h2><p>서버에서 검증되어 저장된 실행 정의입니다.</p></div><button class="button button-ghost button-small" type="button" @click="emit('navigate', { page: 'catalog-edit-json', catalogKey: detail.catalogKey })">수정</button></div><pre class="json-viewer">{{ JSON.stringify(detail.definition, null, 2) }}</pre></section>
         <section v-if="extensions.length" class="surface-card detail-section"><div class="section-heading"><div><h2 class="help-label">Capability adapter <HelpTooltip label="Capability adapter" :text="HELP_TOOLTIP_COPY.capabilityAdapter" /></h2><p>사전 배포된 TypeScript adapter 지원 상태입니다.</p></div></div><ul class="adapter-list"><li v-for="extension in extensions" :key="`${extension.capability}:${extension.adapterId}`"><code>{{ extension.capability }}</code><span>{{ extension.adapterId }}</span><span class="status-pill" :class="capabilityAdapterRegistry.supports(extension) ? 'success' : 'warning'">{{ capabilityAdapterRegistry.supports(extension) ? '지원됨' : '현재 배포본 미지원' }}</span></li></ul></section>
         <section v-if="formatters.length" class="surface-card detail-section"><div class="section-heading"><div><h2 class="help-label">Output formatter <HelpTooltip label="Output formatter" :text="HELP_TOOLTIP_COPY.outputFormatter" /></h2><p>측정값 표시 형식과 현재 Frontend 배포본의 실행 가능 여부입니다.</p></div></div><ul class="adapter-list"><li v-for="formatter in formatters" :key="formatter.key"><code>{{ formatter.label }}</code><span>{{ formatter.recipeNames.join(', ') }}</span><span class="status-pill" :class="formatter.supported ? 'success' : 'warning'">{{ formatter.supported ? '지원됨' : '현재 배포본 미지원' }}</span></li></ul></section>
+        <section v-if="exposedActions.length" class="surface-card detail-section"><div class="section-heading"><div><h2>테스트 장비 추가 작업</h2><p>테스트 화면에서 사용자가 직접 실행할 수 있도록 허용된 write Recipe입니다.</p></div></div><ul class="adapter-list"><li v-for="recipe in exposedActions" :key="recipe.id"><code>{{ recipe.id }}</code><span>{{ recipe.name }}</span><span class="status-pill success">실행 허용</span></li></ul></section>
       </div>
       <aside class="catalog-side-column"><section class="surface-card detail-section"><div class="section-heading"><div><h2 class="help-label">제품 썸네일 <HelpTooltip label="제품 썸네일" :text="HELP_TOOLTIP_COPY.thumbnail" /></h2></div><button class="button button-ghost button-small" type="button" @click="emit('navigate', { page: 'catalog-edit-thumbnail', catalogKey: detail.catalogKey })">수정</button></div><div class="readonly-thumbnail" :class="{ placeholder: !thumbnailUrl }"><img v-if="thumbnailUrl" :src="thumbnailUrl" :alt="`${detail.title} 썸네일`"><span v-else>이미지 없음</span></div></section></aside>
     </section>

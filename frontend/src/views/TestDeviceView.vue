@@ -54,6 +54,9 @@ function save(updated: TestDevice): void {
   emit('navigate', { page: 'test-device', name: updated.name, catalogKey: updated.catalogKey, catalogRevision: updated.catalogRevision, baudRate: updated.serialConfig.baudRate, slaveId: updated.slaveId, origin: updated.origin })
 }
 
+/** 검증된 장비 설정 변경 결과를 화면 context와 URL에 함께 반영한다. */
+function applyRuntimeDevice(updated: TestDevice): void { save(updated) }
+
 onMounted(load)
 </script>
 
@@ -65,6 +68,6 @@ onMounted(load)
     <div><span>Baudrate</span><strong>{{ device.serialConfig.baudRate.toLocaleString() }}</strong><small>{{ device.serialConfig.dataBits }}{{ device.serialConfig.parity.charAt(0).toUpperCase() }}{{ device.serialConfig.stopBits }}</small></div>
     <div><span>Slave ID</span><strong>{{ device.slaveId }}</strong><small>{{ device.origin === 'scan' ? 'Scan 결과에서 생성' : 'Catalog에서 생성' }}</small></div>
   </section>
-  <TestDeviceRuntimePanel v-if="device && catalog" ref="runtimePanel" :device="device" :catalog="catalog" @connection-change="connectionActive = $event" />
+  <TestDeviceRuntimePanel v-if="device && catalog" ref="runtimePanel" :device="device" :catalog="catalog" @connection-change="connectionActive = $event" @device-change="applyRuntimeDevice" />
   <TestDeviceFormModal v-if="catalog && device" :open="editorOpen" :catalogs="[catalog]" :initial-device="device" :connection-active="connectionActive" catalog-locked @cancel="editorOpen = false" @save="save" />
 </template>
