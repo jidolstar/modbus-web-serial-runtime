@@ -9,7 +9,6 @@ export {
   type DelayStep,
   type EnumRecipeParameter,
   type IntegerRecipeParameter,
-  type ProbeStep,
   type ReadHoldingRegistersStep,
   type Recipe,
   type RecipeMapLookup,

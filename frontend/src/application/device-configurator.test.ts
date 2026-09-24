@@ -138,7 +138,7 @@ describe('DeviceConfigurator', () => {
     expect(result.failedStepId).toBe('verify-new-slave-id')
   })
 
-  it('Baud 변경 검증 실패 후 이전 baud Probe 성공을 recovered 상태로 반환한다', async () => {
+  it('Baud 변경 검증 실패 후 이전 baud 측정 응답을 recovered 상태로 반환한다', async () => {
     const changeFailure = recipeFailure('verify-new-baudrate', new ModbusTimeoutError('verify timeout'))
     const runner = new ScriptedRecipeRunner([SUCCESS_RESULT, changeFailure, SUCCESS_RESULT])
     const transport = new RecordingTransport()
@@ -174,8 +174,8 @@ describe('DeviceConfigurator', () => {
     const runner = new ScriptedRecipeRunner([
       SUCCESS_RESULT,
       timeout('verify-new-baudrate'),
-      timeout('old-probe'),
-      timeout('new-probe'),
+      timeout('old-baud-check'),
+      timeout('new-baud-check'),
     ])
     const transport = new RecordingTransport()
     const configurator = new DeviceConfigurator(new ConfiguratorTestCatalog(), runner, transport)

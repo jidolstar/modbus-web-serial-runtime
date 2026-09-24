@@ -17,7 +17,7 @@ describe('CatalogValidationService', () => {
 
   it('rejects a missing Recipe reference with a stable public error', () => {
     const invalidBundle = cloneJson(catalogBundle)
-    invalidBundle.recipes = invalidBundle.recipes.filter(({ id }) => id !== invalidBundle.profile.recipes.probe)
+    invalidBundle.recipes = invalidBundle.recipes.filter(({ id }) => id !== invalidBundle.profile.recipes.measurements[0])
     assert.throws(
       () => validator.validate(invalidBundle),
       (error: unknown) => error instanceof CatalogError
@@ -28,6 +28,12 @@ describe('CatalogValidationService', () => {
   it('rejects an unsupported property instead of silently storing it', () => {
     const invalidBundle = cloneJson(catalogBundle) as unknown as Record<string, unknown>
     invalidBundle.executableCode = 'return true'
+    assert.throws(() => validator.validate(invalidBundle), CatalogError)
+  })
+
+  it('rejects the removed legacy probe reference', () => {
+    const invalidBundle = cloneJson(catalogBundle) as unknown as { profile: { recipes: Record<string, unknown> } }
+    invalidBundle.profile.recipes.probe = 'legacy.probe'
     assert.throws(() => validator.validate(invalidBundle), CatalogError)
   })
 })

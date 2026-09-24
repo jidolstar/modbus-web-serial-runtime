@@ -19,7 +19,6 @@
     "maxId": 247
   },
   "recipes": {
-    "probe": "cwt-th04s.probe",
     "measurements": ["cwt-th04s.read-measurement"],
     "changeSlaveId": "cwt-th04s.change-slave-id",
     "changeBaudRate": "cwt-th04s.change-baudrate"

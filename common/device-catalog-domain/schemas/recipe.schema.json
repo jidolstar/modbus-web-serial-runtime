@@ -8,7 +8,7 @@
     "schemaVersion": { "const": "1.0" },
     "id": { "$ref": "#/definitions/id" },
     "name": { "type": "string", "minLength": 1 },
-    "kind": { "enum": ["probe", "measurement", "configuration"] },
+    "kind": { "enum": ["measurement", "configuration"] },
     "parameters": {
       "type": "array",
       "uniqueItems": true,
@@ -28,7 +28,6 @@
           { "$ref": "#/definitions/writeSingleRegisterStep" },
           { "$ref": "#/definitions/delayStep" },
           { "$ref": "#/definitions/reopenSerialStep" },
-          { "$ref": "#/definitions/probeStep" },
           { "$ref": "#/definitions/assertEqualsStep" }
         ]
       }
@@ -154,16 +153,6 @@
         "id": { "$ref": "#/definitions/id" },
         "type": { "const": "reopenSerial" },
         "baudRate": { "$ref": "#/definitions/value" }
-      }
-    },
-    "probeStep": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "type", "slaveId"],
-      "properties": {
-        "id": { "$ref": "#/definitions/id" },
-        "type": { "const": "probe" },
-        "slaveId": { "$ref": "#/definitions/value" }
       }
     },
     "assertEqualsStep": {

@@ -1,7 +1,8 @@
 export type AppRoute =
   | { readonly page: 'dashboard' }
+  | { readonly page: 'scan' }
   | { readonly page: 'catalog-list'; readonly search?: string }
-  | { readonly page: 'catalog-add' }
+  | { readonly page: 'catalog-add'; readonly observedBaudRate?: number; readonly observedSlaveId?: number }
   | { readonly page: 'catalog-view'; readonly catalogKey: string }
   | { readonly page: 'catalog-edit-json'; readonly catalogKey: string }
   | { readonly page: 'catalog-edit-thumbnail'; readonly catalogKey: string }
@@ -12,7 +13,18 @@ const CATALOG_KEY_PATTERN = /^[a-z0-9][a-z0-9._-]{0,99}$/ // API URL에 허용�
 
 /** App shell이 새로고침·뒤로가기를 같은 화면 상태로 복원할 때 현재 URL을 제한된 route로 해석한다. */
 export function parseAppRoute(location: Pick<Location, 'pathname' | 'search'> = window.location): AppRoute {
-  if (location.pathname === '/catalogs/add') return { page: 'catalog-add' }
+  if (location.pathname === '/scan') return { page: 'scan' }
+  if (location.pathname === '/catalogs/add') {
+    const parameters = new URLSearchParams(location.search)
+    const observedBaudRate = Number(parameters.get('baudRate'))
+    const observedSlaveId = Number(parameters.get('slaveId'))
+    const route: AppRoute = { page: 'catalog-add' }
+    if (Number.isInteger(observedBaudRate) && observedBaudRate >= 300 && observedBaudRate <= 4_000_000
+      && Number.isInteger(observedSlaveId) && observedSlaveId >= 1 && observedSlaveId <= 247) {
+      return { ...route, observedBaudRate, observedSlaveId }
+    }
+    return route
+  }
   const editPageByPath = { // 수정 책임별 URL을 화면 상태로 변환한다. 예: "/catalogs/edit/files"
     '/catalogs/edit': 'catalog-edit-json',
     '/catalogs/edit/json': 'catalog-edit-json',
@@ -38,8 +50,12 @@ export function parseAppRoute(location: Pick<Location, 'pathname' | 'search'> = 
 /** 화면 버튼에서 호출해 주소와 Vue 화면 상태를 함께 변경한다. 외부 URL은 받지 않는다. */
 export function routeUrl(route: AppRoute): string {
   if (route.page === 'dashboard') return '/'
+  if (route.page === 'scan') return '/scan'
   if (route.page === 'catalog-list') return route.search?.trim() ? `/catalogs?search=${encodeURIComponent(route.search.trim())}` : '/catalogs'
-  if (route.page === 'catalog-add') return '/catalogs/add'
+  if (route.page === 'catalog-add') {
+    if (route.observedBaudRate && route.observedSlaveId) return `/catalogs/add?baudRate=${route.observedBaudRate}&slaveId=${route.observedSlaveId}`
+    return '/catalogs/add'
+  }
   if (route.page === 'catalog-view') return `/catalogs/view?id=${encodeURIComponent(route.catalogKey)}`
   const editPath = route.page.replace('catalog-edit-', '')
   return `/catalogs/edit/${editPath}?id=${encodeURIComponent(route.catalogKey)}`

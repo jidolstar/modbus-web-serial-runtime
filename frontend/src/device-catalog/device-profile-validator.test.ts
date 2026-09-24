@@ -3,7 +3,6 @@ import catalogBundle from '@modbus-manager/device-catalog-domain/examples/cwt-th
 import catalogIndex from '../../public/device-catalog/index.json'
 import changeBaudRateRecipe from '../../public/device-catalog/cwt-th04s/change-baudrate.recipe.json'
 import changeSlaveIdRecipe from '../../public/device-catalog/cwt-th04s/change-slave-id.recipe.json'
-import probeRecipe from '../../public/device-catalog/cwt-th04s/probe.recipe.json'
 import deviceProfile from '../../public/device-catalog/cwt-th04s/profile.json'
 import measurementRecipe from '../../public/device-catalog/cwt-th04s/read-measurement.recipe.json'
 import { DeviceCatalogValidationError } from './catalog-errors'
@@ -24,7 +23,6 @@ describe('DeviceProfileValidator', () => {
     expect(validator.validateDeviceProfile(deviceProfile, 'profile.json').id).toBe('cwt-th04s')
 
     for (const recipe of [
-      probeRecipe,
       measurementRecipe,
       changeSlaveIdRecipe,
       changeBaudRateRecipe,
@@ -36,7 +34,7 @@ describe('DeviceProfileValidator', () => {
   it('Bundle의 누락된 Recipe 참조를 저장 전에 거부한다', () => {
     const invalidBundle = cloneJson(catalogBundle)
     invalidBundle.recipes = invalidBundle.recipes.filter(
-      (recipe) => recipe.id !== invalidBundle.profile.recipes.probe,
+      (recipe) => recipe.id !== invalidBundle.profile.recipes.measurements[0],
     )
 
     expect(() => validator.validateCatalogBundle(invalidBundle, 'broken.bundle.json'))
@@ -61,5 +59,11 @@ describe('DeviceProfileValidator', () => {
 
     expect(() => validator.validateRecipe(invalidRecipe, 'unsupported-step.recipe.json'))
       .toThrowError(/unsupported-step\.recipe\.json\/steps\/0/)
+  })
+
+  it('제거된 probe 참조가 포함된 legacy Profile을 거부한다', () => {
+    const legacyProfile = cloneJson(deviceProfile) as unknown as Record<string, unknown>
+    ;(legacyProfile.recipes as Record<string, unknown>).probe = 'legacy.probe'
+    expect(() => validator.validateDeviceProfile(legacyProfile, 'legacy-profile.json')).toThrowError(/additional properties/)
   })
 })

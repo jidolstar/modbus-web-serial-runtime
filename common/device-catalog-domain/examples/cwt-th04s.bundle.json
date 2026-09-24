@@ -25,7 +25,6 @@
       "maxId": 247
     },
     "recipes": {
-      "probe": "cwt-th04s.probe",
       "measurements": [
         "cwt-th04s.read-measurement"
       ],
@@ -41,32 +40,6 @@
     }
   },
   "recipes": [
-    {
-      "schemaVersion": "1.0",
-      "id": "cwt-th04s.probe",
-      "name": "CWT-TH04S 존재 확인",
-      "kind": "probe",
-      "parameters": [
-        {
-          "name": "deviceId",
-          "label": "현재 Slave ID",
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 247
-        }
-      ],
-      "steps": [
-        {
-          "id": "read-measurement-registers",
-          "type": "readHoldingRegisters",
-          "slaveId": "${deviceId}",
-          "address": 0,
-          "count": 2,
-          "saveAs": "probeRegisters"
-        }
-      ],
-      "onError": "stop"
-    },
     {
       "schemaVersion": "1.0",
       "id": "cwt-th04s.read-measurement",
@@ -145,8 +118,11 @@
         },
         {
           "id": "verify-new-slave-id",
-          "type": "probe",
-          "slaveId": "${targetId}"
+          "type": "readHoldingRegisters",
+          "slaveId": "${targetId}",
+          "address": 0,
+          "count": 1,
+          "saveAs": "verificationRegisters"
         }
       ],
       "onError": "stop"
@@ -198,8 +174,11 @@
         },
         {
           "id": "verify-new-baudrate",
-          "type": "probe",
-          "slaveId": "${deviceId}"
+          "type": "readHoldingRegisters",
+          "slaveId": "${deviceId}",
+          "address": 0,
+          "count": 1,
+          "saveAs": "verificationRegisters"
         }
       ],
       "onError": "stop"

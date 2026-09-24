@@ -1,6 +1,8 @@
 'use strict'
 
-const RecipeKind = Object.freeze({ Probe: 'probe', Measurement: 'measurement', Configuration: 'configuration' })
+const RecipeKind = Object.freeze({ Measurement: 'measurement', Configuration: 'configuration' })
+const RecipeStepType = Object.freeze({ ReadHoldingRegisters: 'readHoldingRegisters', AssertEquals: 'assertEquals' })
+const STANDARD_DEVICE_ID_PARAMETER = 'deviceId'
 
 /** Backend 런타임이 저장 전 Profile–Recipe 참조 무결성을 검사할 때 사용하는 CommonJS 진입점이다. */
 function validateCatalogBundleReferences(bundle) {
@@ -11,7 +13,6 @@ function validateCatalogBundleReferences(bundle) {
     recipesById.set(recipe.id, recipe)
   }
   const references = [
-    bundle.profile.recipes.probe,
     ...(bundle.profile.recipes.measurements || []),
     bundle.profile.recipes.changeSlaveId,
     bundle.profile.recipes.changeBaudRate,
@@ -19,11 +20,9 @@ function validateCatalogBundleReferences(bundle) {
   for (const recipeId of references) {
     if (!recipesById.has(recipeId)) issues.push({ path: '/profile/recipes', message: `존재하지 않는 Recipe를 참조합니다: ${recipeId}` })
   }
-  const probe = recipesById.get(bundle.profile.recipes.probe)
-  if (probe && probe.kind !== RecipeKind.Probe) issues.push({ path: '/profile/recipes/probe', message: 'probe Recipe는 kind=probe여야 합니다.' })
   const extensionCapabilities = (bundle.profile.extensions || []).map(({ capability }) => capability)
   if (new Set(extensionCapabilities).size !== extensionCapabilities.length) issues.push({ path: '/profile/extensions', message: 'extension capability는 Profile 안에서 고유해야 합니다.' })
   return issues
 }
 
-module.exports = { RecipeKind, validateCatalogBundleReferences }
+module.exports = { RecipeKind, RecipeStepType, STANDARD_DEVICE_ID_PARAMETER, validateCatalogBundleReferences }

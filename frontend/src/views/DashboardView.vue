@@ -7,11 +7,15 @@ import AppShell from '../layout/AppShell.vue'
 import CatalogDetailView from './CatalogDetailView.vue'
 import CatalogEditorView from './CatalogEditorView.vue'
 import CatalogManagementView from './CatalogManagementView.vue'
+import DeviceScanView from './DeviceScanView.vue'
 
 defineProps<{ readonly user: AuthUser; readonly isLoggingOut: boolean }>()
 defineEmits<{ logout: [] }>()
 const route = ref<AppRoute>(parseAppRoute())
-const activeSection = computed<'dashboard' | 'catalogs'>(() => route.value.page === 'dashboard' ? 'dashboard' : 'catalogs')
+const activeSection = computed<'dashboard' | 'catalogs' | 'scan'>(() => {
+  if (route.value.page === 'dashboard') return 'dashboard'
+  return route.value.page === 'scan' ? 'scan' : 'catalogs'
+})
 const catalogEditRoute = computed(() => {
   const currentRoute = route.value
   if (currentRoute.page === 'catalog-edit-json') return { mode: 'json' as const, catalogKey: currentRoute.catalogKey }
@@ -28,8 +32,9 @@ function navigate(nextRoute: AppRoute): void {
   route.value = nextRoute
   window.scrollTo({ top: 0, behavior: 'auto' })
 }
-function handleShellNavigation(section: 'dashboard' | 'catalogs'): void {
-  navigate(section === 'dashboard' ? { page: 'dashboard' } : { page: 'catalog-list' })
+function handleShellNavigation(section: 'dashboard' | 'catalogs' | 'scan'): void {
+  if (section === 'dashboard') navigate({ page: 'dashboard' })
+  else navigate(section === 'scan' ? { page: 'scan' } : { page: 'catalog-list' })
 }
 function handlePopState(): void { route.value = parseAppRoute() }
 window.addEventListener('popstate', handlePopState)
@@ -52,6 +57,7 @@ onBeforeUnmount(() => window.removeEventListener('popstate', handlePopState))
     <CatalogManagementView v-else-if="route.page === 'catalog-list'" :search="route.search" @navigate="navigate" />
     <CatalogDetailView v-else-if="route.page === 'catalog-view'" :catalog-key="route.catalogKey" @navigate="navigate" />
     <CatalogEditorView v-else-if="catalogEditRoute" :mode="catalogEditRoute.mode" :catalog-key="catalogEditRoute.catalogKey" @navigate="navigate" />
-    <CatalogEditorView v-else mode="add" @navigate="navigate" />
+    <DeviceScanView v-else-if="route.page === 'scan'" @navigate="navigate" />
+    <CatalogEditorView v-else-if="route.page === 'catalog-add'" mode="add" :observed-baud-rate="route.observedBaudRate" :observed-slave-id="route.observedSlaveId" @navigate="navigate" />
   </AppShell>
 </template>

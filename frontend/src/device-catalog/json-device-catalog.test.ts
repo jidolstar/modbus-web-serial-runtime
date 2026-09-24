@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import catalogIndex from '../../public/device-catalog/index.json'
 import changeBaudRateRecipe from '../../public/device-catalog/cwt-th04s/change-baudrate.recipe.json'
 import changeSlaveIdRecipe from '../../public/device-catalog/cwt-th04s/change-slave-id.recipe.json'
-import probeRecipe from '../../public/device-catalog/cwt-th04s/probe.recipe.json'
 import deviceProfile from '../../public/device-catalog/cwt-th04s/profile.json'
 import measurementRecipe from '../../public/device-catalog/cwt-th04s/read-measurement.recipe.json'
 import { DeviceCatalogError, DeviceCatalogValidationError } from './catalog-errors'
@@ -14,7 +13,6 @@ function createCatalogFiles(): Map<string, unknown> {
   return new Map<string, unknown>([
     ['/catalog/index.json', catalogIndex],
     ['/catalog/cwt-th04s/profile.json', deviceProfile],
-    ['/catalog/cwt-th04s/probe.recipe.json', probeRecipe],
     ['/catalog/cwt-th04s/read-measurement.recipe.json', measurementRecipe],
     ['/catalog/cwt-th04s/change-slave-id.recipe.json', changeSlaveIdRecipe],
     ['/catalog/cwt-th04s/change-baudrate.recipe.json', changeBaudRateRecipe],
@@ -62,30 +60,20 @@ describe('JsonDeviceCatalog', () => {
   it('Profile이 존재하지 않는 Recipe를 참조하면 전체 로딩을 거부한다', async () => {
     const files = createCatalogFiles()
     const invalidProfile = cloneJson(deviceProfile)
-    invalidProfile.recipes.probe = 'missing.probe'
+    invalidProfile.recipes.measurements = ['missing.measurement']
     files.set('/catalog/cwt-th04s/profile.json', invalidProfile)
     const catalog = new JsonDeviceCatalog('/catalog', undefined, createFetch(files))
 
-    await expect(catalog.load()).rejects.toThrowError(/존재하지 않는 Recipe.*missing\.probe/)
+    await expect(catalog.load()).rejects.toThrowError(/존재하지 않는 Recipe.*missing\.measurement/)
     expect(() => catalog.listProfiles()).toThrowError(DeviceCatalogError)
   })
 
-  it('장비를 변경할 수 있는 Step이 포함된 Probe를 안전하지 않은 설정으로 거부한다', async () => {
+  it('제거된 probe 참조를 가진 Profile을 거부한다', async () => {
     const files = createCatalogFiles()
-    const unsafeProbe = cloneJson(probeRecipe) as unknown as {
-      steps: Array<Record<string, unknown>>
-    }
-    unsafeProbe.steps[0] = {
-      id: 'unsafe-write',
-      type: 'writeSingleRegister',
-      slaveId: '${deviceId}',
-      address: 2000,
-      value: 1,
-    }
-    files.set('/catalog/cwt-th04s/probe.recipe.json', unsafeProbe)
+    const legacyProfile = cloneJson(deviceProfile) as unknown as Record<string, unknown>
+    ;(legacyProfile.recipes as Record<string, unknown>).probe = 'legacy.probe'
+    files.set('/catalog/cwt-th04s/profile.json', legacyProfile)
     const catalog = new JsonDeviceCatalog('/catalog', undefined, createFetch(files))
-
     await expect(catalog.load()).rejects.toThrowError(DeviceCatalogValidationError)
-    await expect(catalog.load()).rejects.toThrowError(/Probe Recipe.*readHoldingRegisters/)
   })
 })

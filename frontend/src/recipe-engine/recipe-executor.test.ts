@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
 import changeBaudRateRecipeJson from '../../public/device-catalog/cwt-th04s/change-baudrate.recipe.json'
-import probeRecipeJson from '../../public/device-catalog/cwt-th04s/probe.recipe.json'
 import profileJson from '../../public/device-catalog/cwt-th04s/profile.json'
 import measurementRecipeJson from '../../public/device-catalog/cwt-th04s/read-measurement.recipe.json'
 import type { DeviceCatalog } from '../device-catalog/catalog.types'
@@ -28,7 +27,6 @@ function createValidatedFixtures(extraRecipes: ReadonlyArray<unknown> = []): {
   const validator = new DeviceProfileValidator()
   const profile = validator.validateDeviceProfile(cloneJson(profileJson), 'profile.json')
   const recipeCandidates = [
-    probeRecipeJson,
     measurementRecipeJson,
     changeBaudRateRecipeJson,
     ...extraRecipes,
@@ -149,13 +147,13 @@ describe('RecipeExecutor', () => {
     expect(modbusClient.reads).toHaveLength(0)
   })
 
-  it('Profile map을 적용해 baudrate register를 쓰고 port를 다시 연 뒤 Probe한다', async () => {
+  it('Profile map을 적용해 baudrate register를 쓰고 port를 다시 연 뒤 응답을 확인한다', async () => {
     const baudRecipe = cloneJson(changeBaudRateRecipeJson)
     const delayStep = baudRecipe.steps.find((step) => step.type === 'delay')
     if (delayStep?.type === 'delay') delayStep.milliseconds = 0
     const validator = new DeviceProfileValidator()
     const profile = validator.validateDeviceProfile(cloneJson(profileJson), 'profile.json')
-    const recipes = [probeRecipeJson, baudRecipe].map((recipe, index) => (
+    const recipes = [baudRecipe].map((recipe, index) => (
       validator.validateRecipe(cloneJson(recipe), `baud-${index}.json`)
     ))
     const modbusClient = new RecordingModbusClient()
@@ -174,7 +172,7 @@ describe('RecipeExecutor', () => {
 
     expect(modbusClient.writes).toEqual([[100, 2001, 2]])
     expect(serialTransport.reopenCalls[0].baudRate).toBe(9600)
-    expect(modbusClient.reads).toEqual([[100, 0, 2]])
+    expect(modbusClient.reads).toEqual([[100, 0, 1]])
     expect(result.steps).toHaveLength(4)
   })
 

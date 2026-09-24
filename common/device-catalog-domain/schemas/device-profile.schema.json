@@ -36,9 +36,7 @@
     "recipes": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["probe"],
       "properties": {
-        "probe": { "$ref": "#/definitions/id" },
         "measurements": {
           "type": "array",
           "uniqueItems": true,

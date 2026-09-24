@@ -146,6 +146,8 @@ dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .status-pill { display: inline-flex; min-height: 25px; flex: 0 0 auto; align-items: center; padding: 3px 8px; border-radius: 999px; font-size: .67rem; font-weight: 800; }
 .status-pill.success { color: #047857; background: #ecfdf5; }
 .status-pill.warning { color: #92400e; background: #fffbeb; }
+.status-pill.error { color: #991b1b; background: #fef2f2; }
+.status-pill.progress { color: var(--brand-700); background: var(--brand-100); }
 .status-pill.muted { color: var(--slate-500); background: var(--slate-100); }
 .catalog-list-meta { display: flex; gap: 14px; color: var(--slate-500); font: .67rem ui-monospace, SFMono-Regular, Consolas, monospace; }
 .adapter-note { margin: 0; color: #92400e; font-size: .7rem; }
@@ -183,6 +185,7 @@ dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .adapter-list li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px; border-radius: 8px; background: white; font-size: .72rem; }
 .adapter-list code { overflow-wrap: anywhere; color: var(--brand-700); }
 .text-link { margin: 0 0 16px; padding: 0; border: 0; color: var(--brand-600); background: transparent; cursor: pointer; font-size: .76rem; font-weight: 700; }
+.text-link.inline { margin: 0; text-align: left; }
 .detail-page-heading { align-items: flex-start; }
 .page-heading-actions { display: flex; gap: 8px; padding-top: 26px; }
 .catalog-overview { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin-bottom: 16px; border-radius: 10px; }
@@ -208,6 +211,33 @@ dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .edit-management h2 { margin: 0; color: var(--slate-900); font-size: .95rem; }
 .edit-management p { margin: 4px 0 0; color: var(--slate-500); font-size: .72rem; }
 
+.scan-config-panel, .scan-progress, .scan-results-panel { padding: 20px; border-radius: 10px; }
+.scan-config-panel h2, .scan-results-panel h2 { margin: 0; color: var(--slate-900); font-size: .95rem; }
+.scan-baud-options { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 0; padding: 0; border: 0; }
+.scan-baud-options legend { width: 100%; margin-bottom: 2px; color: var(--slate-700); font-size: .76rem; font-weight: 700; }
+.scan-baud-options label { display: inline-flex; min-height: 34px; align-items: center; gap: 7px; padding: 0 11px; border: 1px solid var(--slate-200); border-radius: 7px; color: var(--slate-700); background: var(--slate-50); font-size: .74rem; font-weight: 600; }
+.scan-baud-options input { accent-color: var(--brand-600); }
+.scan-range-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 220px)); gap: 12px; margin-top: 16px; }
+.scan-range-fields label { display: grid; gap: 7px; color: var(--slate-700); font-size: .76rem; font-weight: 700; }
+.scan-range-fields input { width: 100%; min-height: 40px; padding: 8px 11px; border: 1px solid var(--slate-200); border-radius: 7px; color: var(--slate-800); background: white; }
+.scan-range-fields input:focus { border-color: var(--brand-500); outline: 3px solid rgb(59 130 246 / 16%); }
+.scan-actions { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
+.scan-progress { display: grid; gap: 10px; margin-top: 16px; }
+.scan-progress > div { display: flex; justify-content: space-between; gap: 16px; color: var(--slate-700); font-size: .76rem; }
+.scan-progress > div span { color: var(--slate-500); }
+.scan-progress progress { width: 100%; height: 8px; overflow: hidden; border: 0; border-radius: 999px; accent-color: var(--brand-600); }
+.scan-current-target { margin: 0; color: var(--brand-700); font: 700 .74rem ui-monospace, SFMono-Regular, Consolas, monospace; }
+.scan-counts { justify-content: flex-start !important; gap: 8px !important; }
+.scan-counts span { padding: 4px 8px; border-radius: 999px; background: var(--slate-100); font-weight: 700; }
+.scan-results-panel { margin-top: 16px; }
+.scan-results-panel > .section-heading > span { color: var(--slate-500); font-size: .74rem; }
+.scan-result-list { display: grid; margin-top: 16px; border: 1px solid var(--slate-200); border-radius: 8px; }
+.scan-result-row { display: grid; grid-template-columns: 150px 110px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 13px; border-bottom: 1px solid var(--slate-200); }
+.scan-result-row:last-child { border-bottom: 0; }
+.scan-result-address, .scan-result-copy { display: grid; min-width: 0; gap: 3px; }
+.scan-result-address strong { color: var(--slate-800); font-size: .78rem; }
+.scan-result-address span, .scan-result-copy > span { color: var(--slate-500); font-size: .69rem; line-height: 1.5; }
+
 @media (max-width: 900px) {
   .app-sidebar { transform: translateX(-100%); transition: transform .2s ease; }
   .app-sidebar.open { transform: translateX(0); box-shadow: 20px 0 50px rgb(15 23 42 / 24%); }
@@ -220,6 +250,8 @@ dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
   .catalog-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .catalog-overview > div:nth-child(2) { border-right: 0; }
   .catalog-overview > div:nth-child(-n+2) { border-bottom: 1px solid var(--slate-200); }
+  .scan-result-row { grid-template-columns: 130px 100px minmax(0, 1fr); }
+  .scan-result-row > .button { grid-column: 3; justify-self: start; }
 }
 
 @media (max-width: 700px) {
@@ -249,6 +281,10 @@ dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
   .thumbnail-preview { width: min(300px, 100%); height: auto; aspect-ratio: 1; }
   .asset-list li { grid-template-columns: minmax(0, 1fr) auto; }
   .asset-list li .inline-actions { grid-column: 1 / -1; }
+  .scan-range-fields { grid-template-columns: 1fr 1fr; }
+  .scan-result-row { grid-template-columns: 1fr auto; gap: 8px 12px; }
+  .scan-result-copy { grid-column: 1 / -1; }
+  .scan-result-row > .button { grid-column: 1 / -1; justify-self: start; }
 }
 
 @media (max-width: 380px) {
@@ -265,6 +301,8 @@ dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
   .catalog-overview > div { border-right: 0; border-bottom: 1px solid var(--slate-200); }
   .catalog-overview > div:last-child { border-bottom: 0; }
   .adapter-list li { grid-template-columns: 1fr; }
+  .scan-range-fields { grid-template-columns: 1fr; }
+  .scan-actions { align-items: stretch; flex-direction: column; }
 }
 
 @media (prefers-reduced-motion: reduce) {

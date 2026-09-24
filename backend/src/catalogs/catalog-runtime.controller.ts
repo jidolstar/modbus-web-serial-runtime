@@ -1,7 +1,7 @@
 import { Controller, Get, UseGuards } from '@nestjs/common'
 import { ApiCookieAuth, ApiExtraModels, ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { SessionAuthGuard } from '../auth/session-auth.guard'
-import { CatalogErrorResponseDto, RuntimeCatalogItemDto, RuntimeCatalogSnapshotDto } from './catalog.dto'
+import { CATALOG_BUNDLE_EXAMPLE, CatalogErrorResponseDto, RuntimeCatalogItemDto, RuntimeCatalogSnapshotDto } from './catalog.dto'
 import { CatalogService } from './catalog.service'
 
 /**
@@ -25,7 +25,7 @@ export class CatalogRuntimeController {
   @ApiOkResponse({
     type: RuntimeCatalogSnapshotDto,
     description: 'catalogKey 오름차순의 활성 Catalog snapshot입니다.',
-    example: { items: [{ catalogKey: 'example-temperature-sensor', revision: 3, definition: { bundleVersion: '1.0', profile: { schemaVersion: '1.0', id: 'example-temperature-sensor', manufacturer: 'Example Devices', model: 'TEMP-100', serial: { default: { baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' }, supportedBaudRates: [9600] }, slave: { defaultId: 1, minId: 1, maxId: 247 }, recipes: { probe: 'example-temperature-sensor.probe' } }, recipes: [{ schemaVersion: '1.0', id: 'example-temperature-sensor.probe', name: '장비 응답 확인', kind: 'probe', parameters: [{ name: 'deviceId', type: 'integer', minimum: 1, maximum: 247 }], steps: [{ id: 'read-status', type: 'readHoldingRegisters', slaveId: '${deviceId}', address: 0, count: 1, saveAs: 'status' }], onError: 'stop' }] } }] },
+    example: { items: [{ catalogKey: 'example-temperature-sensor', revision: 3, definition: CATALOG_BUNDLE_EXAMPLE }] },
   })
   @ApiResponse({ status: 401, type: CatalogErrorResponseDto, description: '유효한 HttpOnly session cookie가 없습니다.', example: { code: 'AUTH_UNAUTHORIZED' } })
   getSnapshot() {

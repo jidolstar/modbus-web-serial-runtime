@@ -41,8 +41,11 @@
     },
     {
       "id": "verify-new-baudrate",
-      "type": "probe",
-      "slaveId": "${deviceId}"
+      "type": "readHoldingRegisters",
+      "slaveId": "${deviceId}",
+      "address": 0,
+      "count": 1,
+      "saveAs": "verificationRegisters"
     }
   ],
   "onError": "stop"

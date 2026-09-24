@@ -3,12 +3,13 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 const PROFILE_EXAMPLE = {
   schemaVersion: '1.0', id: 'example-temperature-sensor', manufacturer: 'Example Devices', model: 'TEMP-100',
   serial: { default: { baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' }, supportedBaudRates: [9600] },
-  slave: { defaultId: 1, minId: 1, maxId: 247 }, recipes: { probe: 'example-temperature-sensor.probe' },
+  slave: { defaultId: 1, minId: 1, maxId: 247 }, recipes: { measurements: ['example-temperature-sensor.read'] },
 }
 const RECIPE_EXAMPLE = {
-  schemaVersion: '1.0', id: 'example-temperature-sensor.probe', name: '장비 응답 확인', kind: 'probe',
+  schemaVersion: '1.0', id: 'example-temperature-sensor.read', name: '온도 읽기', kind: 'measurement',
   parameters: [{ name: 'deviceId', type: 'integer', minimum: 1, maximum: 247 }],
-  steps: [{ id: 'read-status', type: 'readHoldingRegisters', slaveId: '${deviceId}', address: 0, count: 1, saveAs: 'status' }], onError: 'stop',
+  steps: [{ id: 'read-temperature', type: 'readHoldingRegisters', slaveId: '${deviceId}', address: 0, count: 1, saveAs: 'registers' }],
+  outputs: [{ name: 'temperature', source: 'registers[0]', decoder: 'int16', scale: 0.1, unit: '°C' }], onError: 'stop',
 }
 export const CATALOG_BUNDLE_EXAMPLE = { bundleVersion: '1.0', profile: PROFILE_EXAMPLE, recipes: [RECIPE_EXAMPLE] }
 

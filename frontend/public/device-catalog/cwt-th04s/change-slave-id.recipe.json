@@ -34,8 +34,11 @@
     },
     {
       "id": "verify-new-slave-id",
-      "type": "probe",
-      "slaveId": "${targetId}"
+      "type": "readHoldingRegisters",
+      "slaveId": "${targetId}",
+      "address": 0,
+      "count": 1,
+      "saveAs": "verificationRegisters"
     }
   ],
   "onError": "stop"

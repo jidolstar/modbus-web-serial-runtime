@@ -5,10 +5,10 @@ export enum RecipeSchemaVersion { Version1 = '1.0' }
 export enum CatalogBundleSchemaVersion { Version1 = '1.0' }
 export enum SerialParity { None = 'none', Even = 'even', Odd = 'odd' }
 export enum SerialFlowControl { None = 'none', Hardware = 'hardware' }
-export enum RecipeKind { Probe = 'probe', Measurement = 'measurement', Configuration = 'configuration' }
+export enum RecipeKind { Measurement = 'measurement', Configuration = 'configuration' }
 export enum RecipeStepType {
   ReadHoldingRegisters = 'readHoldingRegisters', WriteSingleRegister = 'writeSingleRegister',
-  Delay = 'delay', ReopenSerial = 'reopenSerial', Probe = 'probe', AssertEquals = 'assertEquals',
+  Delay = 'delay', ReopenSerial = 'reopenSerial', AssertEquals = 'assertEquals',
 }
 export enum RecipeDecoderType { Unsigned16 = 'uint16', Signed16 = 'int16' }
 export enum RecipeErrorPolicy { Stop = 'stop' }
@@ -24,7 +24,6 @@ export interface SerialConfig {
 }
 
 export interface DeviceRecipeReferences {
-  readonly probe: string
   readonly measurements?: ReadonlyArray<string>
   readonly changeSlaveId?: string
   readonly changeBaudRate?: string
@@ -64,9 +63,8 @@ export interface ReadHoldingRegistersStep extends RecipeStepBase { readonly type
 export interface WriteSingleRegisterStep extends RecipeStepBase { readonly type: RecipeStepType.WriteSingleRegister; readonly slaveId: RecipeValue; readonly address: number; readonly value: RecipeValue }
 export interface DelayStep extends RecipeStepBase { readonly type: RecipeStepType.Delay; readonly milliseconds: number }
 export interface ReopenSerialStep extends RecipeStepBase { readonly type: RecipeStepType.ReopenSerial; readonly baudRate: RecipeValue }
-export interface ProbeStep extends RecipeStepBase { readonly type: RecipeStepType.Probe; readonly slaveId: RecipeValue }
 export interface AssertEqualsStep extends RecipeStepBase { readonly type: RecipeStepType.AssertEquals; readonly actual: string; readonly expected: RecipeValue }
-export type RecipeStep = ReadHoldingRegistersStep | WriteSingleRegisterStep | DelayStep | ReopenSerialStep | ProbeStep | AssertEqualsStep
+export type RecipeStep = ReadHoldingRegistersStep | WriteSingleRegisterStep | DelayStep | ReopenSerialStep | AssertEqualsStep
 export interface RecipeOutput { readonly name: string; readonly source: string; readonly decoder: RecipeDecoderType; readonly scale?: number; readonly offset?: number; readonly unit?: string }
 export interface Recipe { readonly schemaVersion: RecipeSchemaVersion; readonly id: string; readonly name: string; readonly kind: RecipeKind; readonly parameters?: ReadonlyArray<RecipeParameter>; readonly steps: ReadonlyArray<RecipeStep>; readonly outputs?: ReadonlyArray<RecipeOutput>; readonly onError: RecipeErrorPolicy }
 
@@ -88,7 +86,6 @@ export function validateCatalogBundleReferences(bundle: CatalogBundle): Readonly
   }
 
   const references = [
-    bundle.profile.recipes.probe,
     ...(bundle.profile.recipes.measurements ?? []),
     bundle.profile.recipes.changeSlaveId,
     bundle.profile.recipes.changeBaudRate,
@@ -97,8 +94,6 @@ export function validateCatalogBundleReferences(bundle: CatalogBundle): Readonly
     if (!recipesById.has(recipeId)) issues.push({ path: '/profile/recipes', message: `존재하지 않는 Recipe를 참조합니다: ${recipeId}` })
   }
 
-  const probe = recipesById.get(bundle.profile.recipes.probe)
-  if (probe && probe.kind !== RecipeKind.Probe) issues.push({ path: '/profile/recipes/probe', message: 'probe Recipe는 kind=probe여야 합니다.' })
   const extensionCapabilities = (bundle.profile.extensions ?? []).map(({ capability }) => capability)
   if (new Set(extensionCapabilities).size !== extensionCapabilities.length) issues.push({ path: '/profile/extensions', message: 'extension capability는 Profile 안에서 고유해야 합니다.' })
   return issues

@@ -13,10 +13,10 @@ import { WebSerialTransport } from '../../serial/web-serial-transport'
 const ACTIVE_DEVICE_PROFILE_ID = 'cwt-th04s'
 
 /** 현재 실장비에 사용자가 설정한 Slave ID다. */
-const ACTIVE_DEVICE_SLAVE_ID = 100
+const ACTIVE_DEVICE_SLAVE_ID = 1
 
 /** 현재 실장비에 사용자가 설정한 baudrate다. */
-const ACTIVE_DEVICE_BAUD_RATE = 9_600
+const ACTIVE_DEVICE_BAUD_RATE = 4_800 // 대시보드 CWT-TH04S 연결에 적용할 현장 baudrate. 예: 4800
 
 /** 밀리초 설정을 화면의 초 단위 설명으로 변환할 때 사용하는 단위값이다. */
 const MILLISECONDS_PER_SECOND = 1_000

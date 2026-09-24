@@ -12,6 +12,7 @@ import { deviceCatalogsMigration } from './migrations/20260923_002-device-catalo
 import { catalogAssetsMigration } from './migrations/20260923_003-catalog-assets'
 import { renameCatalogDropDevicesMigration } from './migrations/20260923_004-rename-catalog-drop-devices'
 import { addRetailerLinkTypeMigration } from './migrations/20260923_005-add-retailer-link-type'
+import { removeCatalogProbeMigration } from './migrations/20260924_006-remove-catalog-probe'
 
 const MIGRATION_LOCK_NAME = 'modbus_manager_migrations'
 const MIGRATION_LOCK_TIMEOUT_SECONDS = 30
@@ -24,6 +25,7 @@ class StaticMigrationProvider implements MigrationProvider {
       '20260923_003-catalog-assets': catalogAssetsMigration,
       '20260923_004-rename-catalog-drop-devices': renameCatalogDropDevicesMigration,
       '20260923_005-add-retailer-link-type': addRetailerLinkTypeMigration,
+      '20260924_006-remove-catalog-probe': removeCatalogProbeMigration,
     }
   }
 }

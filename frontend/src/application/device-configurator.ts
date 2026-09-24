@@ -16,7 +16,7 @@ export enum ConfigurationStatus {
   DeviceStateUnknown = 'device-state-unknown',
 }
 
-/** 현재 장비 instance를 식별하고 연결하는 데 필요한 값이다. */
+/** 사용자가 선택한 Catalog로 장비 설정을 변경하는 데 필요한 현재 연결 값이다. */
 export interface DeviceContext {
   /** 장비 동작과 설정 Recipe를 제공하는 Profile ID다. */
   readonly profileId: string
@@ -46,16 +46,16 @@ export interface ConfigurationResult {
   readonly error?: Error
 }
 
-/** Probe 결과를 설정 workflow 내부 판단에만 사용하는 닫힌 집합이다. */
-enum ProbeOutcome {
+/** 측정 Recipe를 이용한 응답 확인 결과를 설정 workflow 내부에서만 사용한다. */
+enum ReachabilityOutcome {
   Reachable = 'reachable',
   NoResponse = 'no-response',
   Failed = 'failed',
 }
 
-/** Probe 결과와 원본 오류를 함께 보관한다. */
-interface ProbeResult {
-  readonly outcome: ProbeOutcome
+/** 응답 확인 결과와 원본 오류를 함께 보관한다. */
+interface ReachabilityResult {
+  readonly outcome: ReachabilityOutcome
   readonly error?: Error
 }
 
@@ -67,7 +67,7 @@ const TARGET_BAUD_PARAMETER = 'targetBaud'
 /**
  * Profile Recipe를 이용해 Slave ID와 baudrate를 변경하고 결과를 재검증한다.
  *
- * write 응답 손실은 실제 적용 여부를 보장하지 않으므로 새/이전 context를 Probe한
+ * write 응답 손실은 실제 적용 여부를 보장하지 않으므로 새/이전 context의 응답을 확인한
  * 뒤에만 verified 또는 recovered 상태를 반환한다.
  */
 export class DeviceConfigurator {
@@ -90,21 +90,21 @@ export class DeviceConfigurator {
     this.#validateSlaveId(profile, targetSlaveId)
     throwIfOperationAborted(signal)
 
-    const currentProbe = await this.#probe(currentContext, signal)
-    if (currentProbe.outcome !== ProbeOutcome.Reachable) {
+    const currentReachability = await this.#checkReachability(currentContext, signal)
+    if (currentReachability.outcome !== ReachabilityOutcome.Reachable) {
       return this.#result(
-        currentProbe.outcome === ProbeOutcome.NoResponse
+        currentReachability.outcome === ReachabilityOutcome.NoResponse
           ? ConfigurationStatus.VerificationFailed
           : ConfigurationStatus.DeviceStateUnknown,
         currentContext,
-        currentProbe.outcome === ProbeOutcome.NoResponse ? null : currentContext,
-        currentProbe.error,
+        currentReachability.outcome === ReachabilityOutcome.NoResponse ? null : currentContext,
+        currentReachability.error,
       )
     }
 
     const targetContext = Object.freeze({ ...currentContext, slaveId: targetSlaveId })
-    const targetBeforeWrite = await this.#probe(targetContext, signal)
-    if (targetBeforeWrite.outcome === ProbeOutcome.Reachable) {
+    const targetBeforeWrite = await this.#checkReachability(targetContext, signal)
+    if (targetBeforeWrite.outcome === ReachabilityOutcome.Reachable) {
       return this.#result(
         ConfigurationStatus.VerificationFailed,
         currentContext,
@@ -112,7 +112,7 @@ export class DeviceConfigurator {
         new Error(`목표 Slave ID ${targetSlaveId}에서 이미 장비 응답이 있습니다.`),
       )
     }
-    if (targetBeforeWrite.outcome === ProbeOutcome.Failed) {
+    if (targetBeforeWrite.outcome === ReachabilityOutcome.Failed) {
       return this.#result(
         ConfigurationStatus.DeviceStateUnknown,
         currentContext,
@@ -137,19 +137,19 @@ export class DeviceConfigurator {
         return this.#result(ConfigurationStatus.WriteFailed, currentContext, currentContext, this.#toError(error), failedStepId)
       }
 
-      const targetAfterWrite = await this.#probe(targetContext, signal)
-      if (targetAfterWrite.outcome === ProbeOutcome.Reachable) {
+      const targetAfterWrite = await this.#checkReachability(targetContext, signal)
+      if (targetAfterWrite.outcome === ReachabilityOutcome.Reachable) {
         return this.#result(ConfigurationStatus.Verified, currentContext, targetContext, this.#toError(error), failedStepId)
       }
-      const previousAfterWrite = await this.#probe(currentContext, signal)
-      if (previousAfterWrite.outcome === ProbeOutcome.Reachable) {
+      const previousAfterWrite = await this.#checkReachability(currentContext, signal)
+      if (previousAfterWrite.outcome === ReachabilityOutcome.Reachable) {
         return this.#result(ConfigurationStatus.VerificationFailed, currentContext, currentContext, this.#toError(error), failedStepId)
       }
       return this.#result(ConfigurationStatus.DeviceStateUnknown, currentContext, null, this.#toError(error), failedStepId)
     }
   }
 
-  /** Baudrate 변경 실패 시 이전 baud로 reopen하고 Probe해 복구 여부를 구분한다. */
+  /** Baudrate 변경 실패 시 이전 baud로 다시 열고 측정 Recipe 응답으로 복구 여부를 구분한다. */
   public async changeBaudRate(
     currentContext: DeviceContext,
     targetBaudRate: number,
@@ -164,15 +164,15 @@ export class DeviceConfigurator {
     }
     throwIfOperationAborted(signal)
 
-    const currentProbe = await this.#probe(currentContext, signal)
-    if (currentProbe.outcome !== ProbeOutcome.Reachable) {
+    const currentReachability = await this.#checkReachability(currentContext, signal)
+    if (currentReachability.outcome !== ReachabilityOutcome.Reachable) {
       return this.#result(
-        currentProbe.outcome === ProbeOutcome.NoResponse
+        currentReachability.outcome === ReachabilityOutcome.NoResponse
           ? ConfigurationStatus.VerificationFailed
           : ConfigurationStatus.DeviceStateUnknown,
         currentContext,
-        currentProbe.outcome === ProbeOutcome.NoResponse ? null : currentContext,
-        currentProbe.error,
+        currentReachability.outcome === ReachabilityOutcome.NoResponse ? null : currentContext,
+        currentReachability.error,
       )
     }
 
@@ -197,7 +197,7 @@ export class DeviceConfigurator {
       }
 
       const recoveryResult = await this.#recoverPreviousBaud(currentContext, signal)
-      if (recoveryResult.outcome === ProbeOutcome.Reachable) {
+      if (recoveryResult.outcome === ReachabilityOutcome.Reachable) {
         return this.#result(
           ConfigurationStatus.RecoveredOnPreviousConfig,
           currentContext,
@@ -208,51 +208,55 @@ export class DeviceConfigurator {
       }
 
       // 이전 baud에서 찾지 못하면 새 baud를 한 번 확인해 응답 손실 뒤 적용된 경우를 복구한다.
-      const targetProbe = await this.#reopenAndProbe(targetContext, signal)
-      if (targetProbe.outcome === ProbeOutcome.Reachable) {
+      const targetReachability = await this.#reopenAndCheckReachability(targetContext, signal)
+      if (targetReachability.outcome === ReachabilityOutcome.Reachable) {
         return this.#result(ConfigurationStatus.Verified, currentContext, targetContext, this.#toError(error), failedStepId)
       }
       return this.#result(ConfigurationStatus.DeviceStateUnknown, currentContext, null, this.#toError(error), failedStepId)
     }
   }
 
-  /** 지정 context 설정으로 port를 연 뒤 Profile Probe를 실행한다. */
-  async #reopenAndProbe(context: DeviceContext, signal?: AbortSignal): Promise<ProbeResult> {
+  /** 지정 context 설정으로 port를 연 뒤 첫 측정 Recipe로 응답을 확인한다. */
+  async #reopenAndCheckReachability(context: DeviceContext, signal?: AbortSignal): Promise<ReachabilityResult> {
     throwIfOperationAborted(signal)
     try {
       await this.serialTransport.reopen(context.serialConfig)
     } catch (error) {
-      return Object.freeze({ outcome: ProbeOutcome.Failed, error: this.#toError(error) })
+      return Object.freeze({ outcome: ReachabilityOutcome.Failed, error: this.#toError(error) })
     }
-    return this.#probe(context, signal)
+    return this.#checkReachability(context, signal)
   }
 
   /** 이전 baudrate로 transport와 장비 응답을 함께 복구한다. */
-  #recoverPreviousBaud(context: DeviceContext, signal?: AbortSignal): Promise<ProbeResult> {
-    return this.#reopenAndProbe(context, signal)
+  #recoverPreviousBaud(context: DeviceContext, signal?: AbortSignal): Promise<ReachabilityResult> {
+    return this.#reopenAndCheckReachability(context, signal)
   }
 
-  /** 정상 응답과 Modbus exception은 모두 해당 Slave의 존재 신호로 처리한다. */
-  async #probe(context: DeviceContext, signal?: AbortSignal): Promise<ProbeResult> {
+  /** 첫 측정 Recipe를 읽기 전용 연결 확인으로 실행하고 timeout과 기타 실패를 구분한다. */
+  async #checkReachability(context: DeviceContext, signal?: AbortSignal): Promise<ReachabilityResult> {
     throwIfOperationAborted(signal)
     const profile = this.catalog.getProfile(context.profileId)
+    const verificationRecipeId = profile.recipes.measurements?.[0]
+    if (!verificationRecipeId) {
+      return Object.freeze({ outcome: ReachabilityOutcome.Failed, error: new Error(`연결 확인에 사용할 측정 Recipe가 없습니다: ${profile.id}`) })
+    }
     try {
       await this.recipeRunner.execute(
         profile.id,
-        profile.recipes.probe,
+        verificationRecipeId,
         { [STANDARD_DEVICE_ID_PARAMETER]: context.slaveId },
         signal,
       )
-      return Object.freeze({ outcome: ProbeOutcome.Reachable })
+      return Object.freeze({ outcome: ReachabilityOutcome.Reachable })
     } catch (error) {
       this.#throwIfCancelled(error, signal)
       if (findErrorCause(error, ModbusExceptionError)) {
-        return Object.freeze({ outcome: ProbeOutcome.Reachable, error: this.#toError(error) })
+        return Object.freeze({ outcome: ReachabilityOutcome.Reachable, error: this.#toError(error) })
       }
       if (findErrorCause(error, ModbusTimeoutError)) {
-        return Object.freeze({ outcome: ProbeOutcome.NoResponse, error: this.#toError(error) })
+        return Object.freeze({ outcome: ReachabilityOutcome.NoResponse, error: this.#toError(error) })
       }
-      return Object.freeze({ outcome: ProbeOutcome.Failed, error: this.#toError(error) })
+      return Object.freeze({ outcome: ReachabilityOutcome.Failed, error: this.#toError(error) })
     }
   }
 

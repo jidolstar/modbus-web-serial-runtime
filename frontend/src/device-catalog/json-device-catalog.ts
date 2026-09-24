@@ -6,12 +6,7 @@ import {
 import type { DeviceCatalog, DeviceCatalogIndex } from './catalog.types'
 import type { DeviceProfile, DeviceProfileSummary } from './device-profile.types'
 import { DeviceProfileValidator } from './device-profile-validator'
-import {
-  RecipeKind,
-  RecipeStepType,
-  STANDARD_DEVICE_ID_PARAMETER,
-  type Recipe,
-} from './recipe.types'
+import type { Recipe } from './recipe.types'
 
 /** 테스트에서 browser fetch를 대체할 수 있도록 분리한 최소 fetch 함수 타입이다. */
 export type CatalogFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
@@ -95,13 +90,12 @@ export class JsonDeviceCatalog implements DeviceCatalog {
     return recipes
   }
 
-  /** Profile의 Recipe 참조와 Probe의 read-only 제약을 전체 Catalog 관점에서 검증한다. */
+  /** Profile의 Recipe 참조가 모두 로드됐는지 전체 Catalog 관점에서 검증한다. */
   #validateReferences(profiles: DeviceProfile[], recipes: Recipe[]): void {
     const recipesById = new Map(recipes.map((recipe) => [recipe.id, recipe]))
 
     for (const profile of profiles) {
       const referencedRecipeIds = [
-        profile.recipes.probe,
         ...(profile.recipes.measurements ?? []),
         profile.recipes.changeSlaveId,
         profile.recipes.changeBaudRate,
@@ -113,28 +107,6 @@ export class JsonDeviceCatalog implements DeviceCatalog {
             `Profile ${profile.id}이(가) 존재하지 않는 Recipe를 참조합니다: ${recipeId}`,
           )
         }
-      }
-
-      const probeRecipe = recipesById.get(profile.recipes.probe)
-      if (probeRecipe?.kind !== RecipeKind.Probe) {
-        throw new DeviceCatalogValidationError(
-          `Profile ${profile.id}의 probe Recipe는 kind=probe여야 합니다.`,
-        )
-      }
-      const probeParameterNames = (probeRecipe.parameters ?? []).map((parameter) => parameter.name)
-      if (probeParameterNames.length !== 1
-        || probeParameterNames[0] !== STANDARD_DEVICE_ID_PARAMETER) {
-        throw new DeviceCatalogValidationError(
-          `Profile ${profile.id}의 Probe Recipe는 '${STANDARD_DEVICE_ID_PARAMETER}' parameter 하나를 가져야 합니다.`,
-        )
-      }
-      const probeContainsWrite = probeRecipe.steps.some(
-        (step) => step.type !== RecipeStepType.ReadHoldingRegisters,
-      )
-      if (probeContainsWrite) {
-        throw new DeviceCatalogValidationError(
-          `Profile ${profile.id}의 Probe Recipe에는 readHoldingRegisters Step만 허용됩니다.`,
-        )
       }
     }
   }

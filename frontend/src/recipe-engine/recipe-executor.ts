@@ -2,7 +2,6 @@ import type { DeviceCatalog } from '../device-catalog/catalog.types'
 import type { DeviceProfile } from '../device-catalog/device-profile.types'
 import {
   RecipeStepType,
-  STANDARD_DEVICE_ID_PARAMETER,
   type Recipe,
   type RecipeParameter,
   type RecipeStep,
@@ -55,7 +54,6 @@ export class RecipeExecutor implements RecipeRunner {
       [RecipeStepType.WriteSingleRegister, (step, context) => this.#writeSingleRegister(step, context)],
       [RecipeStepType.Delay, (step, context) => this.#delay(step, context)],
       [RecipeStepType.ReopenSerial, (step, context) => this.#reopenSerial(step, context)],
-      [RecipeStepType.Probe, (step, context) => this.#probe(step, context)],
       [RecipeStepType.AssertEquals, (step, context) => this.#assertEquals(step, context)],
     ])
   }
@@ -206,24 +204,6 @@ export class RecipeExecutor implements RecipeRunner {
     const baudRate = this.#valueResolver.resolveNumber(step.baudRate, context.values, context.profile, context.recipe.id)
     const serialConfig: SerialConfig = Object.freeze({ ...context.profile.serial.default, baudRate })
     await this.serialTransport.reopen(serialConfig)
-  }
-
-  async #probe(step: RecipeStep, context: RecipeExecutionContext): Promise<void> {
-    if (step.type !== RecipeStepType.Probe) return this.#wrongHandler(step, context.recipe.id)
-    const slaveId = this.#valueResolver.resolveNumber(step.slaveId, context.values, context.profile, context.recipe.id)
-    const probeRecipe = this.catalog.getRecipe(context.profile.recipes.probe)
-    if (probeRecipe.steps.some((probeStep) => probeStep.type !== RecipeStepType.ReadHoldingRegisters)) {
-      throw new RecipeExecutionError('Probe Recipe에는 readHoldingRegisters Step만 허용됩니다.', context.recipe.id, step.id)
-    }
-    const probeContext: RecipeExecutionContext = {
-      profile: context.profile,
-      recipe: probeRecipe,
-      values: this.#validateParameters(probeRecipe, {
-        [STANDARD_DEVICE_ID_PARAMETER]: slaveId,
-      }),
-      signal: context.signal,
-    }
-    await this.#executeSteps(probeContext)
   }
 
   async #assertEquals(step: RecipeStep, context: RecipeExecutionContext): Promise<void> {

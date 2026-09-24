@@ -9,12 +9,22 @@ import CatalogThumbnailInput from '../features/catalogs/CatalogThumbnailInput.vu
 
 type EditorMode = 'add' | 'json' | 'thumbnail' | 'files' | 'links'
 
-const props = defineProps<{ readonly mode: EditorMode; readonly catalogKey?: string }>()
+const props = defineProps<{ readonly mode: EditorMode; readonly catalogKey?: string; readonly observedBaudRate?: number; readonly observedSlaveId?: number }>()
 const emit = defineEmits<{ navigate: [route: AppRoute] }>()
 const validator = new DeviceProfileValidator()
 const detail = ref<CatalogDetail | null>(null)
 const title = ref('')
-const definitionText = ref(props.mode === 'add' ? JSON.stringify(exampleBundle, null, 2) : '')
+function initialDefinition(): string {
+  if (props.mode !== 'add') return ''
+  const definition = JSON.parse(JSON.stringify(exampleBundle)) as typeof exampleBundle
+  if (props.observedBaudRate && props.observedSlaveId) {
+    definition.profile.serial.default.baudRate = props.observedBaudRate
+    definition.profile.serial.supportedBaudRates = [...new Set([...definition.profile.serial.supportedBaudRates, props.observedBaudRate])].sort((left, right) => left - right)
+    definition.profile.slave.defaultId = props.observedSlaveId
+  }
+  return JSON.stringify(definition, null, 2)
+}
+const definitionText = ref(initialDefinition())
 const validationMessages = ref<string[]>([])
 const notice = ref<string | null>(null)
 const busy = ref(false)

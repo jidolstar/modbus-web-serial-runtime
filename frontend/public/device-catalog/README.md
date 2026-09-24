@@ -11,7 +11,6 @@ device-catalog/
 ├── index.json
 └── example-device/
     ├── profile.json
-    ├── probe.recipe.json
     ├── read-measurement.recipe.json
     ├── change-slave-id.recipe.json       # 지원할 때만 작성
     └── change-baudrate.recipe.json       # 지원할 때만 작성
@@ -26,7 +25,7 @@ device-catalog/
 - 제조사와 모델
 - 기본 Serial 설정과 지원 baudrate
 - Slave ID 기본값과 범위
-- Probe, 측정, 설정 변경 Recipe ID
+- 측정과 설정 변경 Recipe ID
 - Baudrate register code처럼 장비별로 다른 named map
 
 register 주소, scale 또는 장비별 delay를 TypeScript 상수나 `.env`로 옮기지 않는다. 각각 사용하는 Recipe에 기록한다.
@@ -49,7 +48,6 @@ register 주소, scale 또는 장비별 delay를 TypeScript 상수나 `.env`로 
   },
   "slave": { "defaultId": 1, "minId": 1, "maxId": 247 },
   "recipes": {
-    "probe": "example-device.probe",
     "measurements": ["example-device.read-measurement"]
   }
 }
@@ -57,7 +55,7 @@ register 주소, scale 또는 장비별 delay를 TypeScript 상수나 `.env`로 
 
 ## Recipe v1 지원 범위
 
-지원 Step은 다음 여섯 개로 제한된다.
+지원 Step은 다음 다섯 개로 제한된다.
 
 | Step | 목적 |
 |---|---|
@@ -65,12 +63,11 @@ register 주소, scale 또는 장비별 delay를 TypeScript 상수나 `.env`로 
 | `writeSingleRegister` | FC06 register 쓰기 |
 | `delay` | 설정 적용 대기 |
 | `reopenSerial` | 변경된 baudrate로 port 다시 열기 |
-| `probe` | Profile의 read-only Probe 실행 |
 | `assertEquals` | 읽은 값 검증 |
 
 지원 decoder는 `uint16`, `int16`, `scale`, `offset`이다. 임의 JavaScript, 함수 이름, 조건문, 반복문과 일반 객체 property 접근은 허용되지 않는다.
 
-측정과 Probe Recipe는 현재 Slave ID를 받는 `deviceId` parameter를 사용한다.
+측정 Recipe는 현재 Slave ID를 받는 `deviceId` parameter를 사용한다.
 
 설정 변경 서비스가 Recipe를 장비와 무관하게 호출할 수 있도록 parameter 이름은 다음 계약을 사용한다.
 
@@ -82,9 +79,9 @@ Step ID는 Recipe 안에서만 고유하면 되며 특정 문자열로 고정하
 ```json
 {
   "schemaVersion": "1.0",
-  "id": "example-device.probe",
-  "name": "Example 장비 확인",
-  "kind": "probe",
+  "id": "example-device.read-measurement",
+  "name": "Example 장비 측정",
+  "kind": "measurement",
   "parameters": [
     { "name": "deviceId", "type": "integer", "minimum": 1, "maximum": 247 }
   ],
@@ -102,8 +99,6 @@ Step ID는 Recipe 안에서만 고유하면 되며 특정 문자열로 고정하
 }
 ```
 
-Probe는 Scan과 설정 검증에 사용되므로 `kind`가 `probe`여야 하며 `readHoldingRegisters` Step만 포함할 수 있다. Probe에 Write를 넣으면 Catalog 로딩이 거부된다.
-
 ## 등록 절차
 
 1. 장비 매뉴얼에서 Serial 설정, Slave 범위, register 주소와 값 변환 규칙을 확인한다.
@@ -112,7 +107,7 @@ Probe는 Scan과 설정 검증에 사용되므로 `kind`가 `probe`여야 하며
 4. `index.json`에 Profile과 Recipe 상대 경로를 추가한다.
 5. `npm test`로 Schema, 참조, enum 일치 테스트를 실행한다.
 6. `npm run typecheck`와 `npm run build`를 실행한다.
-7. 실제 장비에서 Probe와 측정값을 먼저 검증한 뒤 설정 변경을 검증한다.
+7. 실제 장비에서 측정값을 먼저 검증한 뒤 설정 변경을 검증한다.
 
 JSON 오류에는 파일 URL과 오류 경로가 함께 표시된다. 일부 파일만 유효한 경우에도 기존 Catalog는 부분 교체되지 않는다.
 
@@ -122,7 +117,7 @@ JSON 오류에는 파일 URL과 오류 경로가 함께 표시된다. 일부 파
 
 - FC04, FC10 등 현재 `ModbusClient`가 지원하지 않는 Function Code
 - float32, word swap, string, bit field decoder
-- 현재 여섯 Step으로 표현할 수 없는 장비 절차
+- 현재 다섯 Step으로 표현할 수 없는 장비 절차
 - 제조사 전용 checksum이나 Modbus RTU가 아닌 framing
 
 Backend Catalog가 추가되더라도 Profile/Recipe 계약과 `DeviceCatalog` 인터페이스는 그대로 유지한다.

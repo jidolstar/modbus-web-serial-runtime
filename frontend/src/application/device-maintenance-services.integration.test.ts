@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import changeBaudRateRecipeJson from '../../public/device-catalog/cwt-th04s/change-baudrate.recipe.json'
 import changeSlaveIdRecipeJson from '../../public/device-catalog/cwt-th04s/change-slave-id.recipe.json'
-import probeRecipeJson from '../../public/device-catalog/cwt-th04s/probe.recipe.json'
 import profileJson from '../../public/device-catalog/cwt-th04s/profile.json'
+import measurementRecipeJson from '../../public/device-catalog/cwt-th04s/read-measurement.recipe.json'
 import type { DeviceCatalog } from '../device-catalog/catalog.types'
 import type { DeviceProfile, DeviceProfileSummary } from '../device-catalog/device-profile.types'
 import { DeviceProfileValidator } from '../device-catalog/device-profile-validator'
@@ -15,7 +15,6 @@ import { SerialFlowControl, SerialParity, type SerialConfig } from '../serial/se
 import { MockSerialTransport } from '../serial/testing/mock-serial-transport'
 import { ConfigurationStatus, type DeviceContext } from './device-configurator'
 import { createDeviceMaintenanceServices } from './device-maintenance-services'
-import { DeviceScanResponseStatus } from './device-scanner'
 
 /** CWT 실장비와 같은 현재 9600/8N1 설정이다. */
 const CURRENT_SERIAL_CONFIG: SerialConfig = Object.freeze({
@@ -34,7 +33,7 @@ class CwtTestCatalog implements DeviceCatalog {
   public constructor() {
     const validator = new DeviceProfileValidator()
     this.#profile = validator.validateDeviceProfile(profileJson, 'profile.json')
-    const recipes = [probeRecipeJson, changeSlaveIdRecipeJson, changeBaudRateRecipeJson]
+    const recipes = [measurementRecipeJson, changeSlaveIdRecipeJson, changeBaudRateRecipeJson]
       .map((recipe, index) => validator.validateRecipe(recipe, `recipe-${index}.json`))
     this.#recipes = new Map(recipes.map((recipe) => [recipe.id, recipe]))
   }
@@ -50,7 +49,7 @@ class CwtTestCatalog implements DeviceCatalog {
 }
 
 describe('Device maintenance CWT integration', () => {
-  it('실제 CWT Probe/ID/Baud 변경 Recipe를 Mock RTU transport에서 순서대로 실행한다', async () => {
+  it('실제 CWT 측정/ID/Baud 변경 Recipe를 Mock RTU transport에서 순서대로 실행한다', async () => {
     const catalog = new CwtTestCatalog()
     const transport = new MockSerialTransport()
     await transport.open(CURRENT_SERIAL_CONFIG)
@@ -64,14 +63,10 @@ describe('Device maintenance CWT integration', () => {
       const functionCode = requestFrame[1]
       if (functionCode === ModbusFunctionCode.ReadHoldingRegisters) {
         if (requestedSlaveId !== activeSlaveId) return
+        const registerCount = (requestFrame[4] << 8) | requestFrame[5]
+        const registerBytes = registerCount === 1 ? [0x02, 0x11] : [0x02, 0x11, 0x01, 0x40]
         transport.emitReceivedBytes(appendModbusCrc(new Uint8Array([
-          requestedSlaveId,
-          ModbusFunctionCode.ReadHoldingRegisters,
-          4,
-          0x02,
-          0x11,
-          0x01,
-          0x40,
+          requestedSlaveId, ModbusFunctionCode.ReadHoldingRegisters, registerBytes.length, ...registerBytes,
         ])))
       }
       if (functionCode === ModbusFunctionCode.WriteSingleRegister) {
@@ -83,13 +78,6 @@ describe('Device maintenance CWT integration', () => {
         }
       }
     })
-
-    const scanResults = await services.scanner.scan({
-      profileId: 'cwt-th04s',
-      serialConfigs: [CURRENT_SERIAL_CONFIG],
-      slaveIds: [100],
-    })
-    expect(scanResults[0].status).toBe(DeviceScanResponseStatus.Responded)
 
     const currentContext: DeviceContext = Object.freeze({
       profileId: 'cwt-th04s',
