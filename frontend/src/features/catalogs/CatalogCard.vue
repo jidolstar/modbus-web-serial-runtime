@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { catalogApi, type CatalogSummary } from '../../device-catalog/catalog-api'
+import HelpTooltip from '../../components/HelpTooltip.vue'
+import { HELP_TOOLTIP_COPY } from '../../components/help-tooltip-copy'
 
 const props = defineProps<{ readonly catalog: CatalogSummary }>()
 defineEmits<{ view: [] }>()
@@ -23,10 +25,10 @@ onBeforeUnmount(() => { if (thumbnailUrl.value) URL.revokeObjectURL(thumbnailUrl
     </div>
     <div class="catalog-card-body">
       <div class="catalog-card-heading"><div><h2>{{ catalog.title }}</h2><p>{{ catalog.manufacturer }} · {{ catalog.model }}</p></div></div>
-      <div class="catalog-list-meta"><span>{{ catalog.catalogKey }}</span><span>Revision {{ catalog.revision }}</span></div>
-      <p v-if="catalog.usesExtensions" class="adapter-note">전용 capability adapter 선언 포함</p>
+      <div class="catalog-list-meta"><span class="help-label">Catalog key <HelpTooltip label="Catalog key" :text="HELP_TOOLTIP_COPY.catalogKey" /> {{ catalog.catalogKey }}</span><span class="help-label">Revision <HelpTooltip label="Revision" :text="HELP_TOOLTIP_COPY.revision" /> {{ catalog.revision }}</span></div>
+      <p v-if="catalog.usesExtensions" class="adapter-note help-label">전용 capability adapter 선언 포함 <HelpTooltip label="Capability adapter" :text="HELP_TOOLTIP_COPY.capabilityAdapter" /></p>
     </div>
-    <span class="status-pill" :class="catalog.enabled ? 'success' : 'muted'">{{ catalog.enabled ? '활성' : '비활성' }}</span>
+    <span class="catalog-card-status"><span class="status-pill" :class="catalog.enabled ? 'success' : 'muted'">{{ catalog.enabled ? '활성' : '비활성' }}</span><HelpTooltip label="카탈로그 상태" :text="HELP_TOOLTIP_COPY.catalogStatus" /></span>
     <button class="button button-ghost button-small" type="button" @click="$emit('view')">상세 보기</button>
   </article>
 </template>

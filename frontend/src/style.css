@@ -28,6 +28,15 @@ body.navigation-open { overflow: hidden; }
 button, input, select, textarea { font: inherit; }
 button { min-height: 0; }
 button:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px solid rgb(59 130 246 / 35%); outline-offset: 2px; }
+.help-label { display: inline-flex; min-width: 0; align-items: center; gap: 5px; }
+.form-field { display: grid; gap: 7px; }
+.field-label { display: inline-flex; align-items: center; gap: 5px; color: var(--slate-700); font-size: .76rem; font-weight: 700; }
+.field-label label { color: inherit; font: inherit; }
+.help-tooltip { display: inline-flex; flex: 0 0 auto; vertical-align: middle; }
+.help-tooltip-trigger { display: inline-grid; width: 18px; height: 18px; padding: 0; place-items: center; border: 1px solid var(--slate-400); border-radius: 50%; color: var(--slate-500); background: white; cursor: help; font: 800 11px/1 system-ui, sans-serif; }
+.help-tooltip-trigger:hover, .help-tooltip-trigger[aria-expanded="true"] { border-color: var(--brand-500); color: var(--brand-700); background: var(--brand-50); }
+.help-tooltip-trigger:focus-visible { border-color: var(--brand-500); outline: 3px solid rgb(59 130 246 / 20%); outline-offset: 2px; }
+.help-tooltip-content { position: fixed; z-index: 1000; width: max-content; max-width: min(280px, calc(100vw - 24px)); padding: 10px 12px; border: 1px solid #334155; border-radius: 8px; color: white; background: #1e293b; box-shadow: 0 10px 30px rgb(15 23 42 / 24%); font-size: .75rem; font-weight: 500; line-height: 1.55; pointer-events: auto; }
 #app { min-height: 100vh; }
 
 .app-shell { min-height: 100vh; background: var(--slate-100); }
@@ -150,6 +159,7 @@ dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .status-pill.progress { color: var(--brand-700); background: var(--brand-100); }
 .status-pill.muted { color: var(--slate-500); background: var(--slate-100); }
 .catalog-list-meta { display: flex; gap: 14px; color: var(--slate-500); font: .67rem ui-monospace, SFMono-Regular, Consolas, monospace; }
+.catalog-card-status, .file-status-with-help, .scan-result-status { display: inline-flex; align-items: center; gap: 6px; }
 .adapter-note { margin: 0; color: #92400e; font-size: .7rem; }
 .empty-panel { padding: 42px 20px; border-radius: 12px; color: var(--slate-500); text-align: center; }
 .catalog-editor { padding: 22px; border-radius: 10px; }
@@ -272,6 +282,7 @@ dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
   .catalog-list-row { grid-template-columns: 52px minmax(0, 1fr) auto; gap: 11px; padding: 11px; }
   .catalog-thumbnail { width: 48px; height: 48px; }
   .catalog-list-row > .status-pill { grid-column: 2; justify-self: start; }
+  .catalog-list-row > .catalog-card-status { grid-column: 2; justify-self: start; }
   .catalog-list-row > .button { grid-column: 3; grid-row: 1 / span 2; }
   .catalog-editor { padding: 16px; }
   .editor-actions { flex-wrap: wrap; }
@@ -294,6 +305,7 @@ dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
   .catalog-list-row { grid-template-columns: 44px minmax(0, 1fr); }
   .catalog-thumbnail { width: 42px; height: 42px; }
   .catalog-list-row > .status-pill { grid-column: 2; }
+  .catalog-list-row > .catalog-card-status { grid-column: 2; }
   .catalog-list-row > .button { grid-column: 1 / -1; grid-row: auto; justify-self: stretch; }
   .inline-actions { align-items: stretch; flex-direction: column; }
   .edit-management { align-items: stretch; flex-direction: column; }

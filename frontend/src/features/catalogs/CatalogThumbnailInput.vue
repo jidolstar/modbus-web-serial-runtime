@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { catalogApi } from '../../device-catalog/catalog-api'
+import HelpTooltip from '../../components/HelpTooltip.vue'
+import { HELP_TOOLTIP_COPY } from '../../components/help-tooltip-copy'
 
 const props = defineProps<{ readonly catalogKey: string }>()
 const emit = defineEmits<{ changed: []; error: [message: string] }>()
@@ -35,7 +37,7 @@ onBeforeUnmount(() => { if (imageUrl.value) URL.revokeObjectURL(imageUrl.value) 
 
 <template>
   <section class="asset-section">
-    <div class="section-heading"><div><h3>제품 썸네일</h3><p>서버가 중앙 기준 300×300 JPEG로 변환합니다.</p></div></div>
+    <div class="section-heading"><div><h3 class="help-label">제품 썸네일 <HelpTooltip label="제품 썸네일" :text="HELP_TOOLTIP_COPY.thumbnail" /></h3><p>서버가 중앙 기준 300×300 JPEG로 변환합니다.</p></div></div>
     <div class="thumbnail-editor">
       <div class="thumbnail-preview" :class="{ placeholder: !imageUrl }"><img v-if="imageUrl" :src="imageUrl" alt="변환될 제품 썸네일 미리보기"><span v-else>이미지 없음</span></div>
       <div class="field-stack"><label>새 이미지<input type="file" accept="image/png,image/jpeg,image/webp" @change="choose"></label><button class="button button-primary" type="button" :disabled="!selectedFile || busy" @click="upload">{{ busy ? '업로드 중…' : '등록·교체' }}</button><small>삭제 기능은 제공하지 않으며 다른 이미지로 교체할 수 있습니다.</small></div>

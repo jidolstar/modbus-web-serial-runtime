@@ -6,6 +6,8 @@ import type { AppRoute } from '../device-catalog/catalog-route'
 import { DeviceProfileValidator } from '../device-catalog/device-profile-validator'
 import CatalogAssetsPanel from '../features/catalogs/CatalogAssetsPanel.vue'
 import CatalogThumbnailInput from '../features/catalogs/CatalogThumbnailInput.vue'
+import HelpTooltip from '../components/HelpTooltip.vue'
+import { HELP_TOOLTIP_COPY } from '../components/help-tooltip-copy'
 
 type EditorMode = 'add' | 'json' | 'thumbnail' | 'files' | 'links'
 
@@ -119,11 +121,11 @@ onMounted(loadForEdit)
   <header class="page-heading detail-page-heading"><div><button class="text-link" type="button" @click="emit('navigate', cancelRoute())">← 돌아가기</button><p class="eyebrow">{{ mode === 'add' ? 'NEW CATALOG' : 'EDIT CATALOG' }}</p><h1>{{ pageTitle }}</h1><p class="description">{{ pageDescriptionByMode[mode] }}</p></div></header>
   <p v-if="notice" class="notice" :class="noticeIsSuccess ? 'success' : 'error'">{{ notice }}</p>
   <section v-if="mode === 'add' || mode === 'json'" class="catalog-editor surface-card">
-    <div class="editor-fields"><label>카탈로그 제목<input v-model="title" maxlength="160" placeholder="Example TEMP-100 온도 센서"></label><label>CatalogBundle JSON<textarea v-model="definitionText" rows="28" spellcheck="false" aria-describedby="json-help"></textarea><small id="json-help">입력 JSON은 Schema로 검증하며 코드로 실행하지 않습니다.</small></label></div>
+    <div class="editor-fields"><div class="form-field"><span class="field-label"><label for="catalog-title">카탈로그 제목</label><HelpTooltip label="카탈로그 제목" :text="HELP_TOOLTIP_COPY.catalogTitle" /></span><input id="catalog-title" v-model="title" maxlength="160" placeholder="Example TEMP-100 온도 센서"></div><div class="form-field"><span class="field-label"><label for="catalog-definition">CatalogBundle JSON</label><HelpTooltip label="CatalogBundle JSON" :text="HELP_TOOLTIP_COPY.catalogBundle" /></span><textarea id="catalog-definition" v-model="definitionText" rows="28" spellcheck="false" aria-describedby="json-help"></textarea><small id="json-help">입력 JSON은 Schema로 검증하며 코드로 실행하지 않습니다.</small></div></div>
     <div v-if="validationMessages.length" class="notice error" role="alert"><strong>검증 결과</strong><ul><li v-for="message in validationMessages" :key="message">{{ message }}</li></ul></div>
     <div class="editor-actions"><button v-if="mode === 'add'" class="button button-ghost button-small" type="button" @click="definitionText = JSON.stringify(exampleBundle, null, 2)">예시 불러오기</button><button class="button button-ghost button-small" type="button" @click="emit('navigate', cancelRoute())">취소</button><button class="button button-secondary button-small" type="button" :disabled="busy" @click="validateOnly">검증</button><button class="button button-primary button-small" type="button" :disabled="busy" @click="save">{{ busy ? '처리 중…' : (mode === 'add' ? '등록' : '저장') }}</button></div>
   </section>
-  <section v-if="mode === 'json' && detail" class="edit-management surface-card"><div><h2>운영 상태</h2><p>비활성 카탈로그는 새 Runtime snapshot에서 제외됩니다.</p></div><div class="inline-actions"><span class="status-pill" :class="detail.enabled ? 'success' : 'muted'">{{ detail.enabled ? '활성' : '비활성' }}</span><button class="button button-ghost button-small" type="button" :disabled="busy" @click="toggleStatus">{{ detail.enabled ? '비활성화' : '활성화' }}</button></div></section>
+  <section v-if="mode === 'json' && detail" class="edit-management surface-card"><div><h2 class="help-label">운영 상태 <HelpTooltip label="운영 상태" :text="HELP_TOOLTIP_COPY.operationalStatus" /></h2><p>비활성 카탈로그는 새 Runtime snapshot에서 제외됩니다.</p></div><div class="inline-actions"><span class="status-pill" :class="detail.enabled ? 'success' : 'muted'">{{ detail.enabled ? '활성' : '비활성' }}</span><button class="button button-ghost button-small" type="button" :disabled="busy" @click="toggleStatus">{{ detail.enabled ? '비활성화' : '활성화' }}</button></div></section>
   <CatalogThumbnailInput v-if="mode === 'thumbnail' && detail" :catalog-key="detail.catalogKey" @changed="handleThumbnailChanged" @error="notice = $event" />
   <CatalogAssetsPanel v-if="(mode === 'files' || mode === 'links') && detail" :catalog-key="detail.catalogKey" :mode="mode" @error="notice = $event" />
 </template>
