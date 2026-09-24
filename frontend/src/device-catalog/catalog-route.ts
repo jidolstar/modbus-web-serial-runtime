@@ -8,12 +8,30 @@ export type AppRoute =
   | { readonly page: 'catalog-edit-thumbnail'; readonly catalogKey: string }
   | { readonly page: 'catalog-edit-files'; readonly catalogKey: string }
   | { readonly page: 'catalog-edit-links'; readonly catalogKey: string }
+  | { readonly page: 'test-device'; readonly name: string; readonly catalogKey: string; readonly catalogRevision: number; readonly baudRate: number; readonly slaveId: number; readonly origin: 'catalog' | 'scan' }
 
 const CATALOG_KEY_PATTERN = /^[a-z0-9][a-z0-9._-]{0,99}$/ // API URL에 허용되는 Catalog key. 예: "cwt-th04s"
 
 /** App shell이 새로고침·뒤로가기를 같은 화면 상태로 복원할 때 현재 URL을 제한된 route로 해석한다. */
 export function parseAppRoute(location: Pick<Location, 'pathname' | 'search'> = window.location): AppRoute {
   if (location.pathname === '/scan') return { page: 'scan' }
+  if (location.pathname === '/test-device') {
+    const parameters = new URLSearchParams(location.search)
+    const name = parameters.get('name')?.trim() ?? ''
+    const catalogKey = parameters.get('catalog') ?? ''
+    const catalogRevision = Number(parameters.get('revision'))
+    const baudRate = Number(parameters.get('baudRate'))
+    const slaveId = Number(parameters.get('slaveId'))
+    const origin = parameters.get('origin')
+    if (name.length >= 1 && name.length <= 100 && CATALOG_KEY_PATTERN.test(catalogKey)
+      && Number.isInteger(catalogRevision) && catalogRevision >= 1
+      && Number.isInteger(baudRate) && baudRate >= 300 && baudRate <= 4_000_000
+      && Number.isInteger(slaveId) && slaveId >= 1 && slaveId <= 247
+      && (origin === 'catalog' || origin === 'scan')) {
+      return { page: 'test-device', name, catalogKey, catalogRevision, baudRate, slaveId, origin }
+    }
+    return { page: 'catalog-list' }
+  }
   if (location.pathname === '/catalogs/add') {
     const parameters = new URLSearchParams(location.search)
     const observedBaudRate = Number(parameters.get('baudRate'))
@@ -55,6 +73,13 @@ export function routeUrl(route: AppRoute): string {
   if (route.page === 'catalog-add') {
     if (route.observedBaudRate && route.observedSlaveId) return `/catalogs/add?baudRate=${route.observedBaudRate}&slaveId=${route.observedSlaveId}`
     return '/catalogs/add'
+  }
+  if (route.page === 'test-device') {
+    const parameters = new URLSearchParams({
+      name: route.name, catalog: route.catalogKey, revision: String(route.catalogRevision),
+      baudRate: String(route.baudRate), slaveId: String(route.slaveId), origin: route.origin,
+    })
+    return `/test-device?${parameters}`
   }
   if (route.page === 'catalog-view') return `/catalogs/view?id=${encodeURIComponent(route.catalogKey)}`
   const editPath = route.page.replace('catalog-edit-', '')

@@ -1,7 +1,7 @@
 /** 브라우저와 서버에 모두 공개해도 되는 장비 카탈로그 계약만 이 package에서 내보낸다. */
 
 export enum DeviceProfileSchemaVersion { Version1 = '1.0' }
-export enum RecipeSchemaVersion { Version1 = '1.0' }
+export enum RecipeSchemaVersion { Version1 = '1.0', Version2 = '2.0' }
 export enum CatalogBundleSchemaVersion { Version1 = '1.0' }
 export enum SerialParity { None = 'none', Even = 'even', Odd = 'odd' }
 export enum SerialFlowControl { None = 'none', Hardware = 'hardware' }
@@ -11,7 +11,15 @@ export enum RecipeStepType {
   ReadHoldingRegisters = 'readHoldingRegisters', WriteSingleRegister = 'writeSingleRegister',
   Delay = 'delay', ReopenSerial = 'reopenSerial', AssertEquals = 'assertEquals',
 }
-export enum RecipeDecoderType { Unsigned16 = 'uint16', Signed16 = 'int16' }
+/** Modbus register 배열을 의미 값으로 해석하는, 실행 엔진이 보장하는 기본 decoder 목록이다. */
+export enum RecipeDecoderType {
+  Unsigned16 = 'uint16', Signed16 = 'int16', Unsigned32 = 'uint32', Signed32 = 'int32',
+  Float32 = 'float32', Float64 = 'float64', Bit = 'bit', Ascii = 'ascii', Hex = 'hex',
+}
+export enum RecipeRegisterOrder { HighWordFirst = 'high-word-first', LowWordFirst = 'low-word-first' }
+export enum RecipeRegisterByteOrder { HighByteFirst = 'high-byte-first', LowByteFirst = 'low-byte-first' }
+export enum RecipeStringTrim { None = 'none', Null = 'null', NullAndSpace = 'null-and-space' }
+export enum RecipeFormatterType { Number = 'number', Text = 'text', Boolean = 'boolean', Enum = 'enum', Custom = 'custom' }
 export enum RecipeErrorPolicy { Stop = 'stop' }
 
 export const STANDARD_DEVICE_ID_PARAMETER = 'deviceId'
@@ -66,7 +74,25 @@ export interface DelayStep extends RecipeStepBase { readonly type: RecipeStepTyp
 export interface ReopenSerialStep extends RecipeStepBase { readonly type: RecipeStepType.ReopenSerial; readonly baudRate: RecipeValue }
 export interface AssertEqualsStep extends RecipeStepBase { readonly type: RecipeStepType.AssertEquals; readonly actual: string; readonly expected: RecipeValue }
 export type RecipeStep = ReadHoldingRegistersStep | WriteSingleRegisterStep | DelayStep | ReopenSerialStep | AssertEqualsStep
-export interface RecipeOutput { readonly name: string; readonly source: string; readonly decoder: RecipeDecoderType; readonly scale?: number; readonly offset?: number; readonly unit?: string }
+/** v1 Catalog을 읽기 위한 호환 계약이며 신규 Catalog 작성에는 RecipeOutputV2를 사용한다. */
+export interface LegacyRecipeOutput { readonly name: string; readonly source: string; readonly decoder: RecipeDecoderType.Unsigned16 | RecipeDecoderType.Signed16; readonly scale?: number; readonly offset?: number; readonly unit?: string }
+export interface RecipeOutputSource { readonly variable: string; readonly start: number; readonly count: number }
+interface RecipeDecoderBase { readonly type: RecipeDecoderType; readonly registerOrder?: RecipeRegisterOrder; readonly byteOrder?: RecipeRegisterByteOrder }
+export interface Numeric16RecipeDecoder { readonly type: RecipeDecoderType.Unsigned16 | RecipeDecoderType.Signed16 }
+export interface MultiRegisterNumericRecipeDecoder extends RecipeDecoderBase { readonly type: RecipeDecoderType.Unsigned32 | RecipeDecoderType.Signed32 | RecipeDecoderType.Float32 | RecipeDecoderType.Float64 }
+export interface BitRecipeDecoder extends RecipeDecoderBase { readonly type: RecipeDecoderType.Bit; readonly bitIndex: number }
+export interface AsciiRecipeDecoder extends RecipeDecoderBase { readonly type: RecipeDecoderType.Ascii; readonly trim?: RecipeStringTrim }
+export interface HexRecipeDecoder extends RecipeDecoderBase { readonly type: RecipeDecoderType.Hex }
+export type RecipeDecoder = Numeric16RecipeDecoder | MultiRegisterNumericRecipeDecoder | BitRecipeDecoder | AsciiRecipeDecoder | HexRecipeDecoder
+export interface RecipeNumericTransform { readonly scale?: number; readonly offset?: number }
+export interface NumberRecipeFormat { readonly type: RecipeFormatterType.Number; readonly fractionDigits?: number; readonly unit?: string }
+export interface TextRecipeFormat { readonly type: RecipeFormatterType.Text }
+export interface BooleanRecipeFormat { readonly type: RecipeFormatterType.Boolean; readonly trueLabel?: string; readonly falseLabel?: string }
+export interface EnumRecipeFormat { readonly type: RecipeFormatterType.Enum; readonly values: Readonly<Record<string, string>> }
+export interface CustomRecipeFormat { readonly type: RecipeFormatterType.Custom; readonly formatterId: string; readonly options?: Readonly<Record<string, string | number | boolean>> }
+export type RecipeFormat = NumberRecipeFormat | TextRecipeFormat | BooleanRecipeFormat | EnumRecipeFormat | CustomRecipeFormat
+export interface RecipeOutputV2 { readonly name: string; readonly source: RecipeOutputSource; readonly decode: RecipeDecoder; readonly transform?: RecipeNumericTransform; readonly format: RecipeFormat }
+export type RecipeOutput = LegacyRecipeOutput | RecipeOutputV2
 export interface Recipe { readonly schemaVersion: RecipeSchemaVersion; readonly id: string; readonly name: string; readonly kind: RecipeKind; readonly applyMode?: RecipeApplyMode; readonly parameters?: ReadonlyArray<RecipeParameter>; readonly steps: ReadonlyArray<RecipeStep>; readonly outputs?: ReadonlyArray<RecipeOutput>; readonly onError: RecipeErrorPolicy }
 
 export interface CatalogBundle {
@@ -98,6 +124,37 @@ export function validateCatalogBundleReferences(bundle: CatalogBundle): Readonly
   for (const [recipeIndex, recipe] of bundle.recipes.entries()) {
     if (recipe.applyMode === RecipeApplyMode.AfterPowerCycle && recipe.kind !== RecipeKind.Configuration) {
       issues.push({ path: `/recipes/${recipeIndex}/applyMode`, message: '전원 재인가 적용 방식은 설정 Recipe에만 사용할 수 있습니다.' })
+    }
+    for (const [outputIndex, output] of (recipe.outputs ?? []).entries()) {
+      const usesLegacyShape = 'decoder' in output
+      if ((recipe.schemaVersion === RecipeSchemaVersion.Version1) !== usesLegacyShape) {
+        issues.push({ path: `/recipes/${recipeIndex}/outputs/${outputIndex}`, message: `Recipe ${recipe.schemaVersion} output 형식과 일치해야 합니다.` })
+      }
+      if ('decode' in output && output.transform && ![
+        RecipeDecoderType.Unsigned16, RecipeDecoderType.Signed16, RecipeDecoderType.Unsigned32,
+        RecipeDecoderType.Signed32, RecipeDecoderType.Float32, RecipeDecoderType.Float64,
+      ].includes(output.decode.type)) {
+        issues.push({ path: `/recipes/${recipeIndex}/outputs/${outputIndex}/transform`, message: 'scale/offset은 숫자 decoder에만 사용할 수 있습니다.' })
+      }
+      if ('decode' in output) {
+        const requiredCounts: Partial<Record<RecipeDecoderType, number>> = {
+          [RecipeDecoderType.Unsigned16]: 1, [RecipeDecoderType.Signed16]: 1, [RecipeDecoderType.Bit]: 1,
+          [RecipeDecoderType.Unsigned32]: 2, [RecipeDecoderType.Signed32]: 2, [RecipeDecoderType.Float32]: 2,
+          [RecipeDecoderType.Float64]: 4,
+        }
+        const requiredCount = requiredCounts[output.decode.type]
+        if (requiredCount !== undefined && output.source.count !== requiredCount) {
+          issues.push({ path: `/recipes/${recipeIndex}/outputs/${outputIndex}/source/count`, message: `${output.decode.type} decoder에는 register ${requiredCount}개가 필요합니다.` })
+        }
+        const decodedKind = output.decode.type === RecipeDecoderType.Bit ? 'boolean'
+          : [RecipeDecoderType.Ascii, RecipeDecoderType.Hex].includes(output.decode.type) ? 'string' : 'number'
+        const compatible = output.format.type === RecipeFormatterType.Custom
+          || output.format.type === RecipeFormatterType.Enum && decodedKind !== 'boolean'
+          || output.format.type === RecipeFormatterType.Number && decodedKind === 'number'
+          || output.format.type === RecipeFormatterType.Text && decodedKind === 'string'
+          || output.format.type === RecipeFormatterType.Boolean && decodedKind === 'boolean'
+        if (!compatible) issues.push({ path: `/recipes/${recipeIndex}/outputs/${outputIndex}/format`, message: 'decoder 결과 타입과 formatter 타입이 일치해야 합니다.' })
+      }
     }
   }
 

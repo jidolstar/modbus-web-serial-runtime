@@ -11,6 +11,7 @@ import type { SerialTransport } from '../serial/serial-transport'
 import type { SerialConfig } from '../serial/serial-types'
 import { RecipeAbortedError, RecipeExecutionError } from './recipe-execution-errors'
 import { RecipeOutputDecoder } from './recipe-output-decoder'
+import type { RecipeOutputFormatterRegistry } from './recipe-output-formatter'
 import {
   RecipeExecutionStatus,
   RecipeStepExecutionStatus,
@@ -41,14 +42,16 @@ type RecipeStepHandler = (step: RecipeStep, context: RecipeExecutionContext) => 
  */
 export class RecipeExecutor implements RecipeRunner {
   readonly #valueResolver = new RecipeValueResolver()
-  readonly #outputDecoder = new RecipeOutputDecoder()
+  readonly #outputDecoder: RecipeOutputDecoder
   readonly #stepHandlers: ReadonlyMap<RecipeStepType, RecipeStepHandler>
 
   public constructor(
     private readonly catalog: DeviceCatalog,
     private readonly modbusClient: ModbusClient,
     private readonly serialTransport: SerialTransport,
+    formatterRegistry?: RecipeOutputFormatterRegistry,
   ) {
+    this.#outputDecoder = new RecipeOutputDecoder(formatterRegistry)
     this.#stepHandlers = new Map<RecipeStepType, RecipeStepHandler>([
       [RecipeStepType.ReadHoldingRegisters, (step, context) => this.#readHoldingRegisters(step, context)],
       [RecipeStepType.WriteSingleRegister, (step, context) => this.#writeSingleRegister(step, context)],

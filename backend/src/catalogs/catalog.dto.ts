@@ -7,10 +7,10 @@ const PROFILE_EXAMPLE = {
   recipes: { measurements: ['example-temperature-sensor.read'], changeSlaveId: 'example-temperature-sensor.change-slave-id' },
 }
 const RECIPE_EXAMPLE = {
-  schemaVersion: '1.0', id: 'example-temperature-sensor.read', name: '온도 읽기', kind: 'measurement',
+  schemaVersion: '2.0', id: 'example-temperature-sensor.read', name: '온도 읽기', kind: 'measurement',
   parameters: [{ name: 'deviceId', type: 'integer', minimum: 1, maximum: 247 }],
   steps: [{ id: 'read-temperature', type: 'readHoldingRegisters', slaveId: '${deviceId}', address: 0, count: 1, saveAs: 'registers' }],
-  outputs: [{ name: 'temperature', source: 'registers[0]', decoder: 'int16', scale: 0.1, unit: '°C' }], onError: 'stop',
+  outputs: [{ name: 'temperature', source: { variable: 'registers', start: 0, count: 1 }, decode: { type: 'int16' }, transform: { scale: 0.1 }, format: { type: 'number', fractionDigits: 1, unit: '°C' } }], onError: 'stop',
 }
 const POWER_CYCLE_RECIPE_EXAMPLE = {
   schemaVersion: '1.0', id: 'example-temperature-sensor.change-slave-id', name: 'Slave ID 변경', kind: 'configuration',
@@ -32,7 +32,7 @@ export class CatalogWriteRequestDto {
   @ApiProperty({ example: 'Example TEMP-100 온도 센서', maxLength: 160, description: '목록과 검색에 사용하는 사람이 읽기 쉬운 필수 제목입니다.' })
   title!: string // 관리 화면 표시 제목. 예: "Example TEMP-100 온도 센서"
 
-  @ApiProperty({ type: 'object', additionalProperties: true, example: CATALOG_BUNDLE_EXAMPLE, description: 'CatalogBundle v1 Schema와 의미 검증을 모두 통과해야 하는 전체 정의입니다.' })
+  @ApiProperty({ type: 'object', additionalProperties: true, example: CATALOG_BUNDLE_EXAMPLE, description: 'CatalogBundle Schema와 의미 검증을 모두 통과해야 하는 전체 정의입니다.' })
   definition!: object // Profile 하나와 참조 Recipe 전체. 예: CatalogBundle v1
 }
 export class CatalogUpdateRequestDto extends CatalogWriteRequestDto {

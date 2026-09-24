@@ -22,13 +22,14 @@ describe('TypeScript enum과 JSON Schema 일치', () => {
   it('Recipe kind, Step, decoder와 오류 정책 값이 Schema와 정확히 같다', () => {
     const schema = recipeSchema as unknown as {
       properties: {
-        schemaVersion: { const: string }
+        schemaVersion: { enum: string[] }
         kind: { enum: string[] }
         steps: { items: { oneOf: Array<{ $ref: string }> } }
         onError: { const: string }
       }
       definitions: Record<string, unknown> & {
-        output: { properties: { decoder: { enum: string[] } } }
+        numeric16Decoder: { properties: { type: { enum: string[] } } }
+        multiRegisterNumericDecoder: { properties: { type: { enum: string[] } } }
       }
     }
     const schemaStepTypes = schema.properties.steps.items.oneOf.map(({ $ref }) => {
@@ -39,10 +40,12 @@ describe('TypeScript enum과 JSON Schema 일치', () => {
 
     expect(sorted(schema.properties.kind.enum)).toEqual(sorted(Object.values(RecipeKind)))
     expect(sorted(schemaStepTypes)).toEqual(sorted(Object.values(RecipeStepType)))
-    expect(sorted(schema.definitions.output.properties.decoder.enum))
-      .toEqual(sorted(Object.values(RecipeDecoderType)))
+    expect(schema.definitions.numeric16Decoder.properties.type.enum)
+      .toEqual(expect.arrayContaining([RecipeDecoderType.Unsigned16, RecipeDecoderType.Signed16]))
+    expect(schema.definitions.multiRegisterNumericDecoder.properties.type.enum)
+      .toEqual(expect.arrayContaining([RecipeDecoderType.Unsigned32, RecipeDecoderType.Float32, RecipeDecoderType.Float64]))
     expect(schema.properties.onError.const).toBe(RecipeErrorPolicy.Stop)
-    expect(schema.properties.schemaVersion.const).toBe(RecipeSchemaVersion.Version1)
+    expect(sorted(schema.properties.schemaVersion.enum)).toEqual(sorted(Object.values(RecipeSchemaVersion)))
   })
 
   it('Profile Serial enum과 모든 Catalog schemaVersion 값이 TypeScript 계약과 같다', () => {

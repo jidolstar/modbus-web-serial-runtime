@@ -11,6 +11,7 @@ import { DeviceCatalogValidationError } from './catalog-errors'
 import type { DeviceCatalogIndex } from './catalog.types'
 import type { DeviceProfile } from './device-profile.types'
 import type { Recipe } from './recipe.types'
+import { RecipeSchemaVersion } from './recipe.types'
 
 /** JSON Schema 오류를 사람이 수정할 수 있는 한 줄 설명으로 변환한다. */
 function formatSchemaErrors(sourceName: string, errors: ErrorObject[] | null | undefined): string {
@@ -127,6 +128,12 @@ export class DeviceProfileValidator {
       throw new DeviceCatalogValidationError(
         `${sourceName}/outputs: output name은 Recipe 안에서 고유해야 합니다.`,
       )
+    }
+    const invalidOutputIndex = (candidate.outputs ?? []).findIndex((output) => (
+      (candidate.schemaVersion === RecipeSchemaVersion.Version1) !== ('decoder' in output)
+    ))
+    if (invalidOutputIndex >= 0) {
+      throw new DeviceCatalogValidationError(`${sourceName}/outputs/${invalidOutputIndex}: schemaVersion과 output 형식이 일치해야 합니다.`)
     }
 
     return candidate

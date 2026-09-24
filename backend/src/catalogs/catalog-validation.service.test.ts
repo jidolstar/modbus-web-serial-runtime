@@ -56,4 +56,17 @@ describe('CatalogValidationService', () => {
     measurementRecipe.applyMode = 'after-power-cycle'
     assert.throws(() => validator.validate(invalidBundle), CatalogError)
   })
+
+  it('decoder가 요구하는 register count와 다른 v2 output을 거부한다', () => {
+    const invalidBundle = cloneJson(catalogBundle) as unknown as { recipes: Array<{ outputs?: Array<{ source: { count: number } }> }> }
+    invalidBundle.recipes[0].outputs![0].source.count = 2
+    assert.throws(() => validator.validate(invalidBundle), CatalogError)
+  })
+
+  it('문자열 decoder에 숫자 transform을 선언한 v2 output을 거부한다', () => {
+    const invalidBundle = cloneJson(catalogBundle) as unknown as { recipes: Array<{ outputs?: Array<Record<string, unknown>> }> }
+    invalidBundle.recipes[0].outputs![0].decode = { type: 'ascii' }
+    invalidBundle.recipes[0].outputs![0].format = { type: 'text' }
+    assert.throws(() => validator.validate(invalidBundle), CatalogError)
+  })
 })

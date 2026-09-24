@@ -41,7 +41,7 @@
   },
   "recipes": [
     {
-      "schemaVersion": "1.0",
+      "schemaVersion": "2.0",
       "id": "cwt-th04s.read-measurement",
       "name": "CWT-TH04S 온습도 읽기",
       "kind": "measurement",
@@ -67,17 +67,17 @@
       "outputs": [
         {
           "name": "humidity",
-          "source": "measurementRegisters[0]",
-          "decoder": "uint16",
-          "scale": 0.1,
-          "unit": "%RH"
+          "source": { "variable": "measurementRegisters", "start": 0, "count": 1 },
+          "decode": { "type": "uint16" },
+          "transform": { "scale": 0.1 },
+          "format": { "type": "number", "fractionDigits": 1, "unit": "%RH" }
         },
         {
           "name": "temperature",
-          "source": "measurementRegisters[1]",
-          "decoder": "int16",
-          "scale": 0.1,
-          "unit": "°C"
+          "source": { "variable": "measurementRegisters", "start": 1, "count": 1 },
+          "decode": { "type": "int16" },
+          "transform": { "scale": 0.1 },
+          "format": { "type": "number", "fractionDigits": 1, "unit": "°C" }
         }
       ],
       "onError": "stop"

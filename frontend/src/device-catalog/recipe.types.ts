@@ -1,5 +1,9 @@
 export {
   RecipeDecoderType,
+  RecipeFormatterType,
+  RecipeRegisterByteOrder,
+  RecipeRegisterOrder,
+  RecipeStringTrim,
   RecipeApplyMode,
   RecipeErrorPolicy,
   RecipeKind,
@@ -14,6 +18,8 @@ export {
   type Recipe,
   type RecipeMapLookup,
   type RecipeOutput,
+  type RecipeOutputV2,
+  type RecipeFormat,
   type RecipeParameter,
   type RecipeStep,
   type RecipeValue,

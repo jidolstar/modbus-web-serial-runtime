@@ -3,8 +3,12 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { capabilityAdapterRegistry } from '../device-catalog/adapter-registry'
 import { catalogApi, CatalogApiError, type CatalogDetail, type CatalogFileItem, type CatalogLinkItem } from '../device-catalog/catalog-api'
 import type { AppRoute } from '../device-catalog/catalog-route'
+import type { TestDevice } from '../application/test-device'
+import TestDeviceFormModal from '../features/test-device/TestDeviceFormModal.vue'
+import { testBusSession } from '../application/test-bus-session'
 import HelpTooltip from '../components/HelpTooltip.vue'
 import { HELP_TOOLTIP_COPY } from '../components/help-tooltip-copy'
+import { summarizeCatalogFormatters } from '../features/catalogs/catalog-formatter-support'
 
 const props = defineProps<{ readonly catalogKey: string }>()
 const emit = defineEmits<{ navigate: [route: AppRoute] }>()
@@ -15,6 +19,17 @@ const files = ref<CatalogFileItem[]>([])
 const links = ref<CatalogLinkItem[]>([])
 const thumbnailUrl = ref<string | null>(null)
 const extensions = computed(() => detail.value?.definition.profile.extensions ?? [])
+const formatters = computed(() => detail.value ? summarizeCatalogFormatters(detail.value.definition) : [])
+const testDeviceModalOpen = ref(false)
+
+function openTestDevice(device: TestDevice): void {
+  testDeviceModalOpen.value = false
+  emit('navigate', {
+    page: 'test-device', name: device.name, catalogKey: device.catalogKey,
+    catalogRevision: device.catalogRevision, baudRate: device.serialConfig.baudRate,
+    slaveId: device.slaveId, origin: device.origin,
+  })
+}
 
 function publicError(error: unknown): string {
   if (error instanceof CatalogApiError && error.status === 404) return '카탈로그를 찾을 수 없습니다.'
@@ -49,6 +64,7 @@ onBeforeUnmount(() => { if (thumbnailUrl.value) URL.revokeObjectURL(thumbnailUrl
 <template>
   <header class="page-heading detail-page-heading">
     <div><button class="text-link" type="button" @click="emit('navigate', { page: 'catalog-list' })">← 목록으로</button><p class="eyebrow">CATALOG DETAIL</p><h1>{{ detail?.title ?? '카탈로그 상세' }}</h1><p v-if="detail" class="description">{{ detail.manufacturer }} · {{ detail.model }}</p></div>
+    <div v-if="detail" class="page-heading-actions"><button class="button button-primary" type="button" :disabled="!detail.enabled" @click="testDeviceModalOpen = true">테스트 장비 만들기</button></div>
   </header>
   <p v-if="notice" class="notice error">{{ notice }}</p>
   <p v-if="loading" class="empty-panel surface-card">불러오는 중입니다.</p>
@@ -63,10 +79,12 @@ onBeforeUnmount(() => { if (thumbnailUrl.value) URL.revokeObjectURL(thumbnailUrl
       <div class="catalog-main-column">
         <section class="surface-card detail-section"><div class="section-heading"><div><h2 class="help-label">CatalogBundle JSON <HelpTooltip label="CatalogBundle JSON" :text="HELP_TOOLTIP_COPY.catalogBundle" /></h2><p>서버에서 검증되어 저장된 실행 정의입니다.</p></div><button class="button button-ghost button-small" type="button" @click="emit('navigate', { page: 'catalog-edit-json', catalogKey: detail.catalogKey })">수정</button></div><pre class="json-viewer">{{ JSON.stringify(detail.definition, null, 2) }}</pre></section>
         <section v-if="extensions.length" class="surface-card detail-section"><div class="section-heading"><div><h2 class="help-label">Capability adapter <HelpTooltip label="Capability adapter" :text="HELP_TOOLTIP_COPY.capabilityAdapter" /></h2><p>사전 배포된 TypeScript adapter 지원 상태입니다.</p></div></div><ul class="adapter-list"><li v-for="extension in extensions" :key="`${extension.capability}:${extension.adapterId}`"><code>{{ extension.capability }}</code><span>{{ extension.adapterId }}</span><span class="status-pill" :class="capabilityAdapterRegistry.supports(extension) ? 'success' : 'warning'">{{ capabilityAdapterRegistry.supports(extension) ? '지원됨' : '현재 배포본 미지원' }}</span></li></ul></section>
+        <section v-if="formatters.length" class="surface-card detail-section"><div class="section-heading"><div><h2 class="help-label">Output formatter <HelpTooltip label="Output formatter" :text="HELP_TOOLTIP_COPY.outputFormatter" /></h2><p>측정값 표시 형식과 현재 Frontend 배포본의 실행 가능 여부입니다.</p></div></div><ul class="adapter-list"><li v-for="formatter in formatters" :key="formatter.key"><code>{{ formatter.label }}</code><span>{{ formatter.recipeNames.join(', ') }}</span><span class="status-pill" :class="formatter.supported ? 'success' : 'warning'">{{ formatter.supported ? '지원됨' : '현재 배포본 미지원' }}</span></li></ul></section>
       </div>
       <aside class="catalog-side-column"><section class="surface-card detail-section"><div class="section-heading"><div><h2 class="help-label">제품 썸네일 <HelpTooltip label="제품 썸네일" :text="HELP_TOOLTIP_COPY.thumbnail" /></h2></div><button class="button button-ghost button-small" type="button" @click="emit('navigate', { page: 'catalog-edit-thumbnail', catalogKey: detail.catalogKey })">수정</button></div><div class="readonly-thumbnail" :class="{ placeholder: !thumbnailUrl }"><img v-if="thumbnailUrl" :src="thumbnailUrl" :alt="`${detail.title} 썸네일`"><span v-else>이미지 없음</span></div></section></aside>
     </section>
     <section class="surface-card detail-section detail-asset-section"><div class="section-heading"><div><h2 class="help-label">참고 파일 <HelpTooltip label="참고 파일" :text="HELP_TOOLTIP_COPY.referenceFile" /></h2><p class="help-label">등록된 문서를 조회하고 clean 상태의 파일을 다운로드합니다. <HelpTooltip label="clean 상태" :text="HELP_TOOLTIP_COPY.cleanStatus" /></p></div><button class="button button-ghost button-small" type="button" @click="emit('navigate', { page: 'catalog-edit-files', catalogKey: detail.catalogKey })">수정</button></div><ul v-if="files.length" class="asset-list readonly"><li v-for="file in files" :key="file.id"><div><strong>{{ file.title }}</strong><span>{{ file.originalName }} · {{ file.documentType }}</span></div><span class="file-status-with-help"><span class="status-pill" :class="file.status === 'clean' ? 'success' : 'warning'">{{ file.status }}</span><HelpTooltip label="파일 검사 상태" :text="HELP_TOOLTIP_COPY.cleanStatus" /></span><button class="button button-ghost button-small" type="button" :disabled="file.status !== 'clean'" @click="download(file)">다운로드</button></li></ul><p v-else class="empty-copy">등록된 참고 파일이 없습니다.</p></section>
     <section class="surface-card detail-section detail-asset-section"><div class="section-heading"><div><h2 class="help-label">참고 링크 <HelpTooltip label="참고 링크" :text="HELP_TOOLTIP_COPY.referenceLink" /></h2></div><button class="button button-ghost button-small" type="button" @click="emit('navigate', { page: 'catalog-edit-links', catalogKey: detail.catalogKey })">수정</button></div><ul v-if="links.length" class="asset-list readonly"><li v-for="link in links" :key="link.id"><div><strong>{{ link.title }}</strong><a v-if="safeUrl(link.url)" :href="safeUrl(link.url)" target="_blank" rel="noopener noreferrer">{{ link.url }}</a><span v-else>유효하지 않은 URL</span></div><span class="status-pill muted">{{ link.linkType }}</span></li></ul><p v-else class="empty-copy">등록된 참고 링크가 없습니다.</p></section>
   </template>
+  <TestDeviceFormModal v-if="detail" :open="testDeviceModalOpen" :catalogs="[detail]" :initial-catalog-key="detail.catalogKey" :prepare-connection="() => testBusSession.requestPort()" catalog-locked origin="catalog" @cancel="testDeviceModalOpen = false" @save="openTestDevice" />
 </template>

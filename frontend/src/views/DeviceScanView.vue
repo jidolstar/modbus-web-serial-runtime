@@ -1,7 +1,12 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { CatalogScanStatus, type CatalogScanResult } from '../application/catalog-aware-scanner'
+import type { TestDevice } from '../application/test-device'
+import { catalogApi, type CatalogDetail } from '../device-catalog/catalog-api'
 import type { AppRoute } from '../device-catalog/catalog-route'
 import { useCatalogScan } from '../features/scan/use-catalog-scan'
+import TestDeviceFormModal from '../features/test-device/TestDeviceFormModal.vue'
+import { testBusSession } from '../application/test-bus-session'
 import HelpTooltip from '../components/HelpTooltip.vue'
 import { HELP_TOOLTIP_COPY } from '../components/help-tooltip-copy'
 
@@ -11,6 +16,10 @@ const {
   errorMessage, isSupported, progressPercent, results, scanning, selectedBaudRates,
   slaveIdEnd, slaveIdStart, startScan, statusLabel, total,
 } = useCatalogScan()
+const testDeviceModalOpen = ref(false)
+const catalogOptions = ref<CatalogDetail[]>([])
+const selectedResult = ref<CatalogScanResult | null>(null)
+const catalogLoadError = ref<string | null>(null)
 
 function statusClass(status: CatalogScanStatus): string {
   return status === CatalogScanStatus.Discovered ? 'success' : 'muted'
@@ -18,6 +27,27 @@ function statusClass(status: CatalogScanStatus): string {
 
 function registerUnknown(result: CatalogScanResult): void {
   emit('navigate', { page: 'catalog-add', observedBaudRate: result.serialConfig.baudRate, observedSlaveId: result.slaveId })
+}
+
+/** Scan 결과에서 호출해 활성 Catalog를 불러오고 관찰값이 채워진 생성 모달을 연다. */
+async function createTestDeviceFromScan(result: CatalogScanResult): Promise<void> {
+  catalogLoadError.value = null
+  selectedResult.value = result
+  try {
+    const summaries = (await catalogApi.list()).items.filter((catalog) => catalog.enabled)
+    catalogOptions.value = await Promise.all(summaries.map((catalog) => catalogApi.get(catalog.catalogKey)))
+    if (!catalogOptions.value.length) { catalogLoadError.value = '활성 Catalog가 없습니다. 먼저 Catalog를 등록하거나 활성화해 주세요.'; return }
+    testDeviceModalOpen.value = true
+  } catch { catalogLoadError.value = '테스트에 사용할 Catalog 목록을 불러오지 못했습니다.' }
+}
+
+function openTestDevice(device: TestDevice): void {
+  testDeviceModalOpen.value = false
+  emit('navigate', {
+    page: 'test-device', name: device.name, catalogKey: device.catalogKey,
+    catalogRevision: device.catalogRevision, baudRate: device.serialConfig.baudRate,
+    slaveId: device.slaveId, origin: device.origin,
+  })
 }
 </script>
 
@@ -29,6 +59,7 @@ function registerUnknown(result: CatalogScanResult): void {
 
   <p v-if="!isSupported" class="notice error">Web Serial API를 지원하는 데스크톱 Chrome 또는 Edge에서 HTTPS로 접속해 주세요.</p>
   <p v-if="errorMessage" class="notice" :class="errorMessage.includes('취소') ? 'warning' : 'error'">{{ errorMessage }}</p>
+  <p v-if="catalogLoadError" class="notice error">{{ catalogLoadError }}</p>
 
   <section class="surface-card scan-config-panel">
     <div class="section-heading"><div><h2 class="help-label">스캔 범위 <HelpTooltip label="스캔 범위" :text="HELP_TOOLTIP_COPY.scanRange" /></h2><p>범위를 좁힐수록 장비 탐색이 빠르게 끝납니다.</p></div></div>
@@ -62,9 +93,10 @@ function registerUnknown(result: CatalogScanResult): void {
         <div class="scan-result-copy">
           <span>Modbus 응답을 확인했습니다. 사용할 Catalog는 사용자가 직접 지정합니다.</span>
         </div>
-        <button class="button button-ghost button-small" type="button" @click="registerUnknown(result)">새 카탈로그 등록</button>
+        <div class="inline-actions"><button class="button button-primary button-small" type="button" @click="createTestDeviceFromScan(result)">테스트 장비 만들기</button><button class="button button-ghost button-small" type="button" @click="registerUnknown(result)">새 Catalog 등록</button></div>
       </article>
     </div>
     <p v-else class="empty-copy">아직 스캔 결과가 없습니다.</p>
   </section>
+  <TestDeviceFormModal v-if="selectedResult" :open="testDeviceModalOpen" :catalogs="catalogOptions" :initial-baud-rate="selectedResult.serialConfig.baudRate" :initial-slave-id="selectedResult.slaveId" :prepare-connection="() => testBusSession.requestPort()" origin="scan" @cancel="testDeviceModalOpen = false" @save="openTestDevice" />
 </template>

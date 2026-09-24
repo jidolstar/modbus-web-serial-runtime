@@ -15,6 +15,8 @@ export interface DeviceConnectionRequest {
   readonly profileId: string
   readonly slaveId: number
   readonly baudRate: number
+  readonly measurementRecipeId?: string // 생략하면 Profile의 첫 measurement를 사용한다.
+  readonly requestPort?: boolean // false이면 상위 TestBusSession이 이미 선택한 port를 사용한다.
 }
 
 /** UI adapter가 구독하는 Runtime의 불변 상태다. */
@@ -22,6 +24,7 @@ export interface DeviceRuntimeSnapshot {
   readonly initialized: boolean
   readonly connectionState: SerialConnectionState
   readonly activeDevice: DeviceConnectionRequest | null
+  readonly activeMeasurementRecipeId: string | null
   readonly outputs: Readonly<Record<string, RecipeNamedOutput>>
   readonly lastUpdatedAt: Date | null
   readonly error: Error | null
@@ -33,8 +36,8 @@ export type DeviceRuntimeListener = (snapshot: DeviceRuntimeSnapshot) => void
 /**
  * Catalog, Serial 연결과 SensorMonitor 수명주기를 조정하는 Application Service다.
  *
- * 장비별 register 주소나 scale을 알지 않으며 Profile이 가리키는 첫 measurement
- * Recipe를 실행한다. 연결이 끝나면 기존 polling session은 자동 폐기된다.
+ * 장비별 register 주소나 scale을 알지 않으며 Profile이 허용한 measurement Recipe를
+ * 실행한다. 연결이 끝나거나 Recipe가 바뀌면 기존 polling session은 자동 폐기된다.
  */
 export class DynamicDeviceRuntime {
   readonly #listeners = new Set<DeviceRuntimeListener>()
@@ -51,6 +54,7 @@ export class DynamicDeviceRuntime {
       initialized: false,
       connectionState: serialTransport.connectionState,
       activeDevice: null,
+      activeMeasurementRecipeId: null,
       outputs: Object.freeze({}),
       lastUpdatedAt: null,
       error: null,
@@ -85,33 +89,36 @@ export class DynamicDeviceRuntime {
     await this.initialize()
     const profile = this.catalog.getProfile(request.profileId)
     this.#validateConnectionRequest(profile, request)
-    const measurementRecipeId = profile.recipes.measurements?.[0]
+    const measurementRecipeId = request.measurementRecipeId ?? profile.recipes.measurements?.[0]
     if (!measurementRecipeId) throw new Error(`측정 Recipe가 없는 Profile입니다: ${profile.id}`)
+    this.#validateMeasurementRecipe(profile, measurementRecipeId)
 
     this.sensorMonitor.stop()
-    this.#updateSnapshot({ activeDevice: request, outputs: Object.freeze({}), error: null })
+    this.#updateSnapshot({ activeDevice: request, activeMeasurementRecipeId: measurementRecipeId, outputs: Object.freeze({}), error: null })
     try {
-      await this.serialTransport.requestPort()
+      if (request.requestPort !== false) await this.serialTransport.requestPort()
       await this.serialTransport.open(Object.freeze({
         ...profile.serial.default,
         baudRate: request.baudRate,
       }))
-      this.sensorMonitor.start(
-        {
-          profileId: profile.id,
-          recipeId: measurementRecipeId,
-          parameters: Object.freeze({ [STANDARD_DEVICE_ID_PARAMETER]: request.slaveId }),
-        },
-        {
-          onMeasurement: (result) => this.#handleMeasurement(result.outputs),
-          onError: (error) => this.#handleMeasurementError(error),
-        },
-      )
+      this.#startMeasurement(profile.id, measurementRecipeId, request.slaveId)
     } catch (error) {
       const normalizedError = this.#toError(error)
       this.#updateSnapshot({ error: normalizedError })
       throw normalizedError
     }
+  }
+
+  /** Test Device 화면에서 측정 종류를 바꿀 때 port를 유지하고 polling session만 교체한다. */
+  public selectMeasurement(measurementRecipeId: string): void {
+    const activeDevice = this.#snapshot.activeDevice
+    if (this.#snapshot.connectionState !== SerialConnectionState.Connected || !activeDevice) {
+      throw new Error('연결된 테스트 장비에서만 측정 항목을 변경할 수 있습니다.')
+    }
+    const profile = this.catalog.getProfile(activeDevice.profileId)
+    this.#validateMeasurementRecipe(profile, measurementRecipeId)
+    this.#updateSnapshot({ activeMeasurementRecipeId: measurementRecipeId, outputs: Object.freeze({}), lastUpdatedAt: null, error: null })
+    this.#startMeasurement(profile.id, measurementRecipeId, activeDevice.slaveId)
   }
 
   /** polling을 먼저 중단한 뒤 사용자의 정상 종료 사유로 port를 닫는다. */
@@ -148,6 +155,27 @@ export class DynamicDeviceRuntime {
     if (!profile.serial.supportedBaudRates.includes(request.baudRate)) {
       throw new Error(`지원하지 않는 baudrate입니다: ${request.baudRate}`)
     }
+  }
+
+  /** 임의 Recipe 실행을 막기 위해 Profile의 measurement allowlist만 polling에 허용한다. */
+  #validateMeasurementRecipe(
+    profile: ReturnType<DeviceCatalog['getProfile']>,
+    measurementRecipeId: string,
+  ): void {
+    if (!profile.recipes.measurements?.includes(measurementRecipeId)) {
+      throw new Error(`Profile이 허용하지 않는 측정 Recipe입니다: ${measurementRecipeId}`)
+    }
+  }
+
+  /** 연결과 Recipe 전환이 공유하는 SensorMonitor 요청을 한 곳에서 조립한다. */
+  #startMeasurement(profileId: string, recipeId: string, slaveId: number): void {
+    this.sensorMonitor.start(
+      { profileId, recipeId, parameters: Object.freeze({ [STANDARD_DEVICE_ID_PARAMETER]: slaveId }) },
+      {
+        onMeasurement: (result) => this.#handleMeasurement(result.outputs),
+        onError: (error) => this.#handleMeasurementError(error),
+      },
+    )
   }
 
   /** 연결 상태를 반영하고 connected 이외 상태에서는 현재 polling session을 폐기한다. */

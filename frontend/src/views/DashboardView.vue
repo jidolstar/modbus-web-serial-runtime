@@ -2,12 +2,13 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
 import type { AuthUser } from '../auth/auth-api'
 import { parseAppRoute, routeUrl, type AppRoute } from '../device-catalog/catalog-route'
-import CwtTh04sPanel from '../features/cwt-th04s/CwtTh04sPanel.vue'
 import AppShell from '../layout/AppShell.vue'
 import CatalogDetailView from './CatalogDetailView.vue'
 import CatalogEditorView from './CatalogEditorView.vue'
 import CatalogManagementView from './CatalogManagementView.vue'
 import DeviceScanView from './DeviceScanView.vue'
+import TestDeviceView from './TestDeviceView.vue'
+import { testBusSession } from '../application/test-bus-session'
 
 defineProps<{ readonly user: AuthUser; readonly isLoggingOut: boolean }>()
 defineEmits<{ logout: [] }>()
@@ -38,7 +39,7 @@ function handleShellNavigation(section: 'dashboard' | 'catalogs' | 'scan'): void
 }
 function handlePopState(): void { route.value = parseAppRoute() }
 window.addEventListener('popstate', handlePopState)
-onBeforeUnmount(() => window.removeEventListener('popstate', handlePopState))
+onBeforeUnmount(() => { window.removeEventListener('popstate', handlePopState); void testBusSession.close() })
 </script>
 <template>
   <AppShell :user="user" :is-logging-out="isLoggingOut" :active-section="activeSection" @navigate="handleShellNavigation" @logout="$emit('logout')">
@@ -50,14 +51,15 @@ onBeforeUnmount(() => window.removeEventListener('popstate', handlePopState))
       <section class="summary-grid" aria-label="시스템 요약">
       <article class="summary-card"><span class="summary-icon blue" aria-hidden="true">▦</span><div><span>장비 카탈로그</span><strong>DB 연동</strong><small>활성 Catalog를 실행에 사용합니다.</small></div></article>
       <article class="summary-card"><span class="summary-icon green" aria-hidden="true">⌁</span><div><span>통신 실행 위치</span><strong>이 브라우저</strong><small>장비 데이터는 로컬에서 처리됩니다.</small></div></article>
-      <article class="summary-card"><span class="summary-icon amber" aria-hidden="true">◉</span><div><span>테스트 프로필</span><strong>CWT-TH04S</strong><small>온·습도 측정 프로필</small></div></article>
+      <article class="summary-card"><span class="summary-icon amber" aria-hidden="true">◉</span><div><span>테스트 방식</span><strong>Catalog 기반</strong><small>장비별 측정 Recipe를 실행합니다.</small></div></article>
       </section>
-      <CwtTh04sPanel />
+      <section class="surface-card dashboard-start"><div><p class="eyebrow">GET STARTED</p><h2>테스트 장비를 만들어 시작하세요</h2><p class="description">장비 모델을 알고 있다면 Catalog에서 만들고, 통신값을 모르면 먼저 Scan을 실행합니다.</p></div><div class="inline-actions"><button class="button button-primary" type="button" @click="navigate({ page: 'catalog-list' })">Catalog 선택</button><button class="button button-ghost" type="button" @click="navigate({ page: 'scan' })">장비 Scan</button></div></section>
     </template>
     <CatalogManagementView v-else-if="route.page === 'catalog-list'" :search="route.search" @navigate="navigate" />
     <CatalogDetailView v-else-if="route.page === 'catalog-view'" :catalog-key="route.catalogKey" @navigate="navigate" />
     <CatalogEditorView v-else-if="catalogEditRoute" :mode="catalogEditRoute.mode" :catalog-key="catalogEditRoute.catalogKey" @navigate="navigate" />
     <DeviceScanView v-else-if="route.page === 'scan'" @navigate="navigate" />
+    <TestDeviceView v-else-if="route.page === 'test-device'" :route="route" @navigate="navigate" />
     <CatalogEditorView v-else-if="route.page === 'catalog-add'" mode="add" :observed-baud-rate="route.observedBaudRate" :observed-slave-id="route.observedSlaveId" @navigate="navigate" />
   </AppShell>
 </template>

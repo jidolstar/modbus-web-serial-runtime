@@ -90,6 +90,8 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px soli
 .summary-icon.blue { color: var(--brand-700); background: var(--brand-50); }
 .summary-icon.green { color: #047857; background: #ecfdf5; }
 .summary-icon.amber { color: #b45309; background: #fffbeb; }
+.dashboard-start { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 24px; border-radius: 12px; }
+.dashboard-start h2 { margin: 5px 0 6px; color: var(--slate-900); font-size: 1.1rem; }
 
 .sensor-panel { padding: 24px; border-radius: 12px; }
 .sensor-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--slate-200); }
@@ -248,6 +250,33 @@ dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .scan-result-address strong { color: var(--slate-800); font-size: .78rem; }
 .scan-result-address span, .scan-result-copy > span { color: var(--slate-500); font-size: .69rem; line-height: 1.5; }
 
+.test-device-dialog { width: min(560px, calc(100vw - 32px)); max-height: min(760px, calc(100vh - 32px)); padding: 0; overflow: auto; border: 0; border-radius: 14px; color: var(--slate-800); background: white; box-shadow: 0 24px 70px rgb(15 23 42 / 28%); }
+.test-device-dialog::backdrop { background: rgb(15 23 42 / 58%); backdrop-filter: blur(2px); }
+.test-device-modal { display: grid; gap: 18px; padding: 22px; }
+.test-device-modal > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--slate-200); }
+.test-device-modal h2 { margin: 5px 0 4px; color: var(--slate-900); font-size: 1.2rem; }
+.test-device-modal header p:last-child { margin: 0; color: var(--slate-500); font-size: .74rem; line-height: 1.5; }
+.dialog-close { display: grid; width: 36px; height: 36px; flex: 0 0 auto; place-items: center; border: 1px solid var(--slate-200); border-radius: 8px; color: var(--slate-500); background: white; cursor: pointer; font-size: 1.25rem; }
+.test-device-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.test-device-fields label { display: grid; gap: 7px; color: var(--slate-700); font-size: .76rem; font-weight: 700; }
+.test-device-fields label:first-child, .test-device-fields label:nth-child(2) { grid-column: 1 / -1; }
+.test-device-fields input, .test-device-fields select { width: 100%; min-height: 44px; padding: 9px 11px; border: 1px solid var(--slate-200); border-radius: 8px; color: var(--slate-800); background: white; }
+.test-device-fields input:focus, .test-device-fields select:focus, .dialog-close:focus-visible { border-color: var(--brand-500); outline: 3px solid rgb(59 130 246 / 16%); }
+.test-device-fields :disabled { color: var(--slate-500); background: var(--slate-100); }
+.test-device-modal > footer { display: flex; justify-content: flex-end; gap: 8px; padding-top: 4px; }
+.test-device-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: hidden; border-radius: 10px; }
+.test-device-summary > div { display: grid; gap: 5px; padding: 20px; border-right: 1px solid var(--slate-200); }
+.test-device-summary > div:last-child { border-right: 0; }
+.test-device-summary span, .test-device-summary small { color: var(--slate-500); font-size: .7rem; }
+.test-device-summary strong { color: var(--slate-900); font-size: 1rem; }
+.test-device-runtime { margin-top: 16px; }
+.readings.dynamic { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.readings.dynamic > .empty-copy { grid-column: 1 / -1; margin: 0; padding: 24px; border: 1px dashed var(--slate-200); border-radius: 10px; text-align: center; }
+.measurement-selector { display: flex; justify-content: flex-end; margin-top: 18px; }
+.measurement-selector label { display: grid; width: min(360px, 100%); gap: 7px; color: var(--slate-700); font-size: .76rem; font-weight: 700; }
+.measurement-selector select { min-height: 42px; padding: 8px 11px; border: 1px solid var(--slate-200); border-radius: 8px; color: var(--slate-800); background: white; }
+.measurement-selector select:focus { border-color: var(--brand-500); outline: 3px solid rgb(59 130 246 / 16%); }
+
 @media (max-width: 900px) {
   .app-sidebar { transform: translateX(-100%); transition: transform .2s ease; }
   .app-sidebar.open { transform: translateX(0); box-shadow: 20px 0 50px rgb(15 23 42 / 24%); }
@@ -261,7 +290,7 @@ dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
   .catalog-overview > div:nth-child(2) { border-right: 0; }
   .catalog-overview > div:nth-child(-n+2) { border-bottom: 1px solid var(--slate-200); }
   .scan-result-row { grid-template-columns: 130px 100px minmax(0, 1fr); }
-  .scan-result-row > .button { grid-column: 3; justify-self: start; }
+  .scan-result-row > .inline-actions { grid-column: 3; justify-self: start; }
 }
 
 @media (max-width: 700px) {
@@ -271,6 +300,7 @@ dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
   .page-heading { display: block; margin-bottom: 20px; }
   .page-date { display: block; margin-top: 12px; }
   .summary-grid, .readings { grid-template-columns: 1fr; }
+  .dashboard-start { align-items: stretch; flex-direction: column; }
   .summary-card small { white-space: normal; }
   .sensor-panel { padding: 18px; }
   .sensor-header { display: grid; gap: 14px; }
@@ -295,7 +325,10 @@ dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
   .scan-range-fields { grid-template-columns: 1fr 1fr; }
   .scan-result-row { grid-template-columns: 1fr auto; gap: 8px 12px; }
   .scan-result-copy { grid-column: 1 / -1; }
-  .scan-result-row > .button { grid-column: 1 / -1; justify-self: start; }
+  .scan-result-row > .inline-actions { grid-column: 1 / -1; justify-self: start; }
+  .test-device-summary { grid-template-columns: 1fr; }
+  .test-device-summary > div { border-right: 0; border-bottom: 1px solid var(--slate-200); }
+  .test-device-summary > div:last-child { border-bottom: 0; }
 }
 
 @media (max-width: 380px) {
@@ -315,6 +348,11 @@ dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
   .adapter-list li { grid-template-columns: 1fr; }
   .scan-range-fields { grid-template-columns: 1fr; }
   .scan-actions { align-items: stretch; flex-direction: column; }
+  .test-device-dialog { width: 100vw; max-width: none; max-height: calc(100vh - 24px); margin: 24px 0 0; border-radius: 16px 16px 0 0; }
+  .test-device-modal { padding: 18px 16px; }
+  .test-device-fields { grid-template-columns: 1fr; }
+  .test-device-fields label { grid-column: 1 !important; }
+  .test-device-modal > footer { align-items: stretch; flex-direction: column-reverse; }
 }
 
 @media (prefers-reduced-motion: reduce) {

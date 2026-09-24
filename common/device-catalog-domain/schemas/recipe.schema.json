@@ -5,7 +5,7 @@
   "additionalProperties": false,
   "required": ["schemaVersion", "id", "name", "kind", "steps", "onError"],
   "properties": {
-    "schemaVersion": { "const": "1.0" },
+    "schemaVersion": { "enum": ["1.0", "2.0"] },
     "id": { "$ref": "#/definitions/id" },
     "name": { "type": "string", "minLength": 1 },
     "kind": { "enum": ["measurement", "configuration"] },
@@ -38,7 +38,12 @@
     },
     "outputs": {
       "type": "array",
-      "items": { "$ref": "#/definitions/output" }
+      "items": {
+        "oneOf": [
+          { "$ref": "#/definitions/legacyOutput" },
+          { "$ref": "#/definitions/outputV2" }
+        ]
+      }
     },
     "onError": { "const": "stop" }
   },
@@ -173,7 +178,7 @@
         "expected": { "$ref": "#/definitions/value" }
       }
     },
-    "output": {
+    "legacyOutput": {
       "type": "object",
       "additionalProperties": false,
       "required": ["name", "source", "decoder"],
@@ -187,6 +192,105 @@
         "scale": { "type": "number" },
         "offset": { "type": "number" },
         "unit": { "type": "string", "minLength": 1 }
+      }
+    },
+    "outputSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["variable", "start", "count"],
+      "properties": {
+        "variable": { "$ref": "#/definitions/variableName" },
+        "start": { "type": "integer", "minimum": 0 },
+        "count": { "type": "integer", "minimum": 1, "maximum": 125 }
+      }
+    },
+    "decoderBaseProperties": {
+      "registerOrder": { "enum": ["high-word-first", "low-word-first"] },
+      "byteOrder": { "enum": ["high-byte-first", "low-byte-first"] }
+    },
+    "numeric16Decoder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["uint16", "int16"] }
+      }
+    },
+    "multiRegisterNumericDecoder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["uint32", "int32", "float32", "float64"] },
+        "registerOrder": { "enum": ["high-word-first", "low-word-first"] },
+        "byteOrder": { "enum": ["high-byte-first", "low-byte-first"] }
+      }
+    },
+    "bitDecoder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "bitIndex"],
+      "properties": {
+        "type": { "const": "bit" },
+        "bitIndex": { "type": "integer", "minimum": 0, "maximum": 15 },
+        "registerOrder": { "enum": ["high-word-first", "low-word-first"] },
+        "byteOrder": { "enum": ["high-byte-first", "low-byte-first"] }
+      }
+    },
+    "asciiDecoder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "ascii" },
+        "trim": { "enum": ["none", "null", "null-and-space"] },
+        "registerOrder": { "enum": ["high-word-first", "low-word-first"] },
+        "byteOrder": { "enum": ["high-byte-first", "low-byte-first"] }
+      }
+    },
+    "hexDecoder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "hex" },
+        "registerOrder": { "enum": ["high-word-first", "low-word-first"] },
+        "byteOrder": { "enum": ["high-byte-first", "low-byte-first"] }
+      }
+    },
+    "decoder": {
+      "oneOf": [
+        { "$ref": "#/definitions/numeric16Decoder" },
+        { "$ref": "#/definitions/multiRegisterNumericDecoder" },
+        { "$ref": "#/definitions/bitDecoder" },
+        { "$ref": "#/definitions/asciiDecoder" },
+        { "$ref": "#/definitions/hexDecoder" }
+      ]
+    },
+    "transform": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "scale": { "type": "number" }, "offset": { "type": "number" } }
+    },
+    "format": {
+      "oneOf": [
+        { "type": "object", "additionalProperties": false, "required": ["type"], "properties": { "type": { "const": "number" }, "fractionDigits": { "type": "integer", "minimum": 0, "maximum": 12 }, "unit": { "type": "string", "minLength": 1 } } },
+        { "type": "object", "additionalProperties": false, "required": ["type"], "properties": { "type": { "const": "text" } } },
+        { "type": "object", "additionalProperties": false, "required": ["type"], "properties": { "type": { "const": "boolean" }, "trueLabel": { "type": "string" }, "falseLabel": { "type": "string" } } },
+        { "type": "object", "additionalProperties": false, "required": ["type", "values"], "properties": { "type": { "const": "enum" }, "values": { "type": "object", "minProperties": 1, "maxProperties": 256, "additionalProperties": { "type": "string", "maxLength": 160 } } } },
+        { "type": "object", "additionalProperties": false, "required": ["type", "formatterId"], "properties": { "type": { "const": "custom" }, "formatterId": { "$ref": "#/definitions/id" }, "options": { "type": "object", "maxProperties": 16, "additionalProperties": { "anyOf": [{ "type": "string", "maxLength": 160 }, { "type": "number" }, { "type": "boolean" }] } } } }
+      ]
+    },
+    "outputV2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "source", "decode", "format"],
+      "properties": {
+        "name": { "$ref": "#/definitions/id" },
+        "source": { "$ref": "#/definitions/outputSource" },
+        "decode": { "$ref": "#/definitions/decoder" },
+        "transform": { "$ref": "#/definitions/transform" },
+        "format": { "$ref": "#/definitions/format" }
       }
     }
   }

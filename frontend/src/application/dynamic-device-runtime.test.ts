@@ -71,6 +71,7 @@ describe('DynamicDeviceRuntime', () => {
       recipeId: 'cwt-th04s.read-measurement',
       parameters: { deviceId: 100 },
     }])
+    expect(runtime.snapshot.activeMeasurementRecipeId).toBe('cwt-th04s.read-measurement')
   })
 
   it('측정 결과를 snapshot에 반영하고 물리 분리 시 polling session을 정리한다', async () => {
@@ -86,7 +87,7 @@ describe('DynamicDeviceRuntime', () => {
       recipeId: 'cwt-th04s.read-measurement',
       status: RecipeExecutionStatus.Succeeded,
       steps: Object.freeze([]),
-      outputs: Object.freeze({ temperature: Object.freeze({ value: 32, unit: '°C' }) }),
+      outputs: Object.freeze({ temperature: Object.freeze({ value: 32, display: Object.freeze({ text: '32.0', unit: '°C' }) }) }),
       context: Object.freeze({}),
     })
 
@@ -134,5 +135,31 @@ describe('DynamicDeviceRuntime', () => {
     })).rejects.toThrowError(/지원하지 않는 baudrate/)
     expect(transport.connectionState).toBe(SerialConnectionState.Idle)
     expect(monitor.starts).toHaveLength(0)
+  })
+
+  it('연결된 port를 유지하면서 허용된 measurement polling을 다시 시작한다', async () => {
+    const profile = createProfile()
+    const alternateRecipeId = 'cwt-th04s.read-alternate'
+    const catalog = new RuntimeTestCatalog({ ...profile, recipes: { ...profile.recipes, measurements: [...(profile.recipes.measurements ?? []), alternateRecipeId] } })
+    const transport = new MockSerialTransport()
+    const monitor = new RecordingSensorMonitor()
+    const runtime = new DynamicDeviceRuntime(catalog, transport, monitor)
+    await runtime.connect({ profileId: profile.id, slaveId: 7, baudRate: 4800 })
+
+    runtime.selectMeasurement(alternateRecipeId)
+
+    expect(monitor.starts.at(-1)).toEqual({ profileId: profile.id, recipeId: alternateRecipeId, parameters: { deviceId: 7 } })
+    expect(runtime.snapshot.activeMeasurementRecipeId).toBe(alternateRecipeId)
+    expect(runtime.snapshot.connectionState).toBe(SerialConnectionState.Connected)
+  })
+
+  it('Profile이 참조하지 않는 Recipe 전환은 거부한다', async () => {
+    const transport = new MockSerialTransport()
+    const monitor = new RecordingSensorMonitor()
+    const runtime = new DynamicDeviceRuntime(new RuntimeTestCatalog(createProfile()), transport, monitor)
+    await runtime.connect({ profileId: 'cwt-th04s', slaveId: 1, baudRate: 4800 })
+
+    expect(() => runtime.selectMeasurement('unlisted.recipe')).toThrow(/허용하지 않는 측정 Recipe/)
+    expect(monitor.starts).toHaveLength(1)
   })
 })

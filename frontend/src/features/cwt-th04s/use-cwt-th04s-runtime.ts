@@ -103,10 +103,16 @@ export function useCwtTh04sRuntime() {
     () => CONNECTION_LABELS[runtimeSnapshot.value.connectionState],
   )
   const temperature = computed(
-    () => runtimeSnapshot.value.outputs[TEMPERATURE_OUTPUT_NAME]?.value ?? null,
+    () => {
+      const value = runtimeSnapshot.value.outputs[TEMPERATURE_OUTPUT_NAME]?.value
+      return typeof value === 'number' ? value : null
+    },
   )
   const humidity = computed(
-    () => runtimeSnapshot.value.outputs[HUMIDITY_OUTPUT_NAME]?.value ?? null,
+    () => {
+      const value = runtimeSnapshot.value.outputs[HUMIDITY_OUTPUT_NAME]?.value
+      return typeof value === 'number' ? value : null
+    },
   )
   const lastUpdatedAt = computed(() => (
     runtimeSnapshot.value.lastUpdatedAt?.toLocaleTimeString('ko-KR') ?? null

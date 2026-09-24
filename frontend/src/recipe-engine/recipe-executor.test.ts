@@ -124,8 +124,8 @@ describe('RecipeExecutor', () => {
 
     expect(result.status).toBe(RecipeExecutionStatus.Succeeded)
     expect(result.outputs.humidity.value).toBeCloseTo(52.9)
-    expect(result.outputs.humidity.unit).toBe('%RH')
-    expect(result.outputs.temperature).toEqual({ value: -2, unit: '°C' })
+    expect(result.outputs.humidity.display).toEqual({ text: '52.9', unit: '%RH' })
+    expect(result.outputs.temperature).toEqual({ value: -2, display: { text: '-2.0', unit: '°C' } })
     expect(modbusClient.reads).toEqual([[100, 0, 2]])
     expect(result.steps[0].status).toBe(RecipeStepExecutionStatus.Succeeded)
   })

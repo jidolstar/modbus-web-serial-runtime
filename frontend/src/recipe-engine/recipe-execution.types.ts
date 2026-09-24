@@ -23,8 +23,8 @@ export interface RecipeStepResult {
 
 /** decoder가 만든 화면/서비스용 named output이다. */
 export interface RecipeNamedOutput {
-  readonly value: number
-  readonly unit?: string
+  readonly value: number | string | boolean
+  readonly display: { readonly text: string; readonly unit?: string }
 }
 
 /** Recipe가 성공했을 때 반환하는 불변 실행 결과다. */
