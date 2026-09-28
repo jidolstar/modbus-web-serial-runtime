@@ -67,15 +67,49 @@ describe('DeviceProfileValidator', () => {
     expect(() => validator.validateDeviceProfile(legacyProfile, 'legacy-profile.json')).toThrowError(/additional properties/)
   })
 
-  it('actions는 write가 포함된 configuration Recipe만 허용한다', () => {
-    const invalidBundle = cloneJson(catalogBundle) as unknown as { profile: { recipes: { actions: string[] } }; recipes: Array<{ id: string }> }
-    invalidBundle.profile.recipes.actions = [invalidBundle.recipes[0].id]
-    expect(() => validator.validateCatalogBundle(invalidBundle, 'action.bundle.json')).toThrow(/configuration Recipe/)
+  it('output이 있는 읽기 전용 measurement Recipe를 추가 작업으로 공개할 수 있다', () => {
+    const validBundle = cloneJson(catalogBundle) as unknown as { profile: { recipes: { actions: string[]; measurements: string[] } } }
+    validBundle.profile.recipes.actions = [validBundle.profile.recipes.measurements[0]]
+    expect(validator.validateCatalogBundle(validBundle, 'read-action.bundle.json').profile.recipes.actions).toHaveLength(1)
   })
 
   it('write가 포함된 configuration Recipe는 추가 작업으로 공개할 수 있다', () => {
-    const validBundle = cloneJson(catalogBundle) as unknown as { profile: { recipes: { actions: string[]; changeSlaveId: string } } }
-    validBundle.profile.recipes.actions = [validBundle.profile.recipes.changeSlaveId]
+    const validBundle = cloneJson(catalogBundle) as unknown as { profile: { recipes: { actions: string[]; changeSlaveId: string } }; recipes: Array<{ id: string }> }
+    const source = validBundle.recipes.find(({ id }) => id === validBundle.profile.recipes.changeSlaveId)!
+    const action = { ...source, id: 'cwt-th04s.write-safe-setting' }
+    validBundle.recipes.push(action)
+    validBundle.profile.recipes.actions = [action.id]
     expect(validator.validateCatalogBundle(validBundle, 'action.bundle.json').profile.recipes.actions).toHaveLength(1)
+  })
+
+  it('표준 통신 설정 Recipe를 추가 작업으로 중복 공개하면 거부한다', () => {
+    const invalidBundle = cloneJson(catalogBundle) as unknown as { profile: { recipes: { actions: string[]; changeSlaveId: string } } }
+    invalidBundle.profile.recipes.actions = [invalidBundle.profile.recipes.changeSlaveId]
+    expect(() => validator.validateCatalogBundle(invalidBundle, 'duplicate-action.bundle.json')).toThrow(/중복 공개/)
+  })
+
+  it('output이 없는 measurement Recipe를 조회 추가 작업으로 공개하면 거부한다', () => {
+    const invalidBundle = cloneJson(catalogBundle) as unknown as { profile: { recipes: { actions: string[]; measurements: string[] } }; recipes: Array<{ id: string; outputs?: unknown[] }> }
+    const actionId = invalidBundle.profile.recipes.measurements[0]
+    invalidBundle.recipes.find(({ id }) => id === actionId)!.outputs = []
+    invalidBundle.profile.recipes.actions = [actionId]
+    expect(() => validator.validateCatalogBundle(invalidBundle, 'empty-read-action.bundle.json')).toThrow(/읽기 Step과 output/)
+  })
+
+  it('추가 작업 안에서 Serial 연결을 다시 열면 거부한다', () => {
+    const invalidBundle = cloneJson(catalogBundle) as unknown as { profile: { recipes: { actions: string[]; measurements: string[] } }; recipes: Array<{ id: string; steps: Array<Record<string, unknown>> }> }
+    const actionId = invalidBundle.profile.recipes.measurements[0]
+    invalidBundle.recipes.find(({ id }) => id === actionId)?.steps.push({ id: 'reopen', type: 'reopenSerial', baudRate: 9600 })
+    invalidBundle.profile.recipes.actions = [actionId]
+    expect(() => validator.validateCatalogBundle(invalidBundle, 'reopen-action.bundle.json')).toThrow(/Serial 연결을 다시 열 수 없습니다/)
+  })
+
+  it('표준 설정 변경 Recipe가 재접속이나 읽기 검증을 포함하면 거부한다', () => {
+    const invalidBundle = cloneJson(catalogBundle) as unknown as { profile: { recipes: { changeBaudRate: string } }; recipes: Array<{ id: string; steps: Array<Record<string, unknown>> }> }
+    const recipe = invalidBundle.recipes.find(({ id }) => id === invalidBundle.profile.recipes.changeBaudRate)
+    recipe?.steps.push({ id: 'automatic-reopen', type: 'reopenSerial', baudRate: '${targetBaud}' })
+
+    expect(() => validator.validateCatalogBundle(invalidBundle, 'automatic-reconnect.bundle.json'))
+      .toThrow(/쓰기 후 연결·검증 Step을 포함할 수 없습니다/)
   })
 })

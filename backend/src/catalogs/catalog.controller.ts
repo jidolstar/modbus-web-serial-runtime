@@ -38,7 +38,7 @@ export class CatalogController {
   /** 관리 화면의 저장 전 확인 버튼과 create/update가 같은 검증 결과를 사용하게 한다. */
   @Post('validate')
   @UseGuards(SameOriginGuard)
-  @ApiOperation({ summary: 'Catalog Bundle 사전 검증', description: 'DB를 변경하지 않고 title과 CatalogBundle v1의 Schema·참조·범위 규칙을 검사합니다. 허용된 Frontend origin에서만 호출할 수 있습니다.' })
+  @ApiOperation({ summary: 'Catalog Bundle 사전 검증', description: 'DB를 변경하지 않고 title과 CatalogBundle v1의 Schema·참조·범위 규칙을 검사합니다. 표준 통신 설정 변경 Recipe는 쓰기 단계만 허용하며 자동 재접속·읽기 검증은 거부합니다. 허용된 Frontend origin에서만 호출할 수 있습니다.' })
   @ApiBody({ type: CatalogWriteRequestDto })
   @ApiOkResponse({ type: CatalogValidationResponseDto, description: '저장 가능한 Bundle이며 Profile ID에서 catalogKey를 추출했습니다.' })
   @ApiResponse({ status: 400, type: CatalogErrorResponseDto, description: '요청 필드, JSON Schema 또는 Profile–Recipe 의미 규칙이 잘못되었습니다.', example: { code: 'CATALOG_INVALID_INPUT', fields: ['/definition/profile/recipes'] } })

@@ -4,9 +4,10 @@ import { CatalogModule } from './catalogs/catalog.module'
 import { ConfigModule } from './config/config.module'
 import { DatabaseModule } from './database/database.module'
 import { HealthController } from './health.controller'
+import { TestGroupModule } from './test-groups/test-group.module'
 
 @Module({
-  imports: [ConfigModule, DatabaseModule, AuthModule, CatalogModule],
+  imports: [ConfigModule, DatabaseModule, AuthModule, CatalogModule, TestGroupModule],
   controllers: [HealthController],
 })
 export class AppModule {}

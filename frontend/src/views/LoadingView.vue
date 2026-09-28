@@ -1,6 +1,10 @@
 <template>
-  <main class="auth-card" aria-busy="true">
-    <p class="eyebrow">MODBUS MANAGER</p><h1>로그인 상태 확인 중</h1>
-    <p class="description">안전한 세션을 확인하고 있습니다.</p>
+  <main class="app-loading" aria-busy="true" aria-live="polite">
+    <div class="app-loading-content">
+      <span class="app-loading-mark" aria-hidden="true">M</span>
+      <strong>Modbus Manager</strong>
+      <span class="app-loading-spinner" aria-hidden="true" />
+      <p>화면을 불러오는 중입니다.</p>
+    </div>
   </main>
 </template>

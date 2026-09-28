@@ -1,6 +1,5 @@
 import type { DeviceCatalog } from '../device-catalog/catalog.types'
 import type { RecipeRunner } from '../recipe-engine/recipe-execution.types'
-import type { SerialTransport } from '../serial/serial-transport'
 import { DeviceConfigurator } from './device-configurator'
 
 /** 개발 UI나 향후 관리 화면이 사용할 장비 유지보수 서비스 모음이다. */
@@ -17,9 +16,8 @@ export interface DeviceMaintenanceServices {
 export function createDeviceMaintenanceServices(
   catalog: DeviceCatalog,
   recipeRunner: RecipeRunner,
-  serialTransport: SerialTransport,
 ): DeviceMaintenanceServices {
   return Object.freeze({
-    configurator: new DeviceConfigurator(catalog, recipeRunner, serialTransport),
+    configurator: new DeviceConfigurator(catalog, recipeRunner),
   })
 }

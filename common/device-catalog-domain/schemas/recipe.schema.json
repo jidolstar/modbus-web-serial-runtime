@@ -141,7 +141,15 @@
         "type": { "const": "writeSingleRegister" },
         "slaveId": { "$ref": "#/definitions/value" },
         "address": { "type": "integer", "minimum": 0, "maximum": 65535 },
-        "value": { "$ref": "#/definitions/value" }
+        "value": { "$ref": "#/definitions/value" },
+        "encode": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {
+            "type": { "const": "int16" }
+          }
+        }
       }
     },
     "delayStep": {

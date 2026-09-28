@@ -1,11 +1,14 @@
 'use strict'
 
 const RecipeKind = Object.freeze({ Measurement: 'measurement', Configuration: 'configuration' })
+const SerialParity = Object.freeze({ None: 'none', Even: 'even', Odd: 'odd' })
+const SerialFlowControl = Object.freeze({ None: 'none', Hardware: 'hardware' })
 const RecipeApplyMode = Object.freeze({ Immediate: 'immediate', AfterPowerCycle: 'after-power-cycle' })
 const RecipeStepType = Object.freeze({
   ReadHoldingRegisters: 'readHoldingRegisters', WriteSingleRegister: 'writeSingleRegister',
   Delay: 'delay', ReopenSerial: 'reopenSerial', AssertEquals: 'assertEquals',
 })
+const RecipeRegisterEncodingType = Object.freeze({ Signed16: 'int16' })
 const RecipeSchemaVersion = Object.freeze({ Version1: '1.0', Version2: '2.0' })
 const RecipeDecoderType = Object.freeze({ Unsigned16: 'uint16', Signed16: 'int16', Unsigned32: 'uint32', Signed32: 'int32', Float32: 'float32', Float64: 'float64', Bit: 'bit', Ascii: 'ascii', Hex: 'hex' })
 const STANDARD_DEVICE_ID_PARAMETER = 'deviceId'
@@ -27,13 +30,38 @@ function validateCatalogBundleReferences(bundle) {
   for (const recipeId of references) {
     if (!recipesById.has(recipeId)) issues.push({ path: '/profile/recipes', message: `존재하지 않는 Recipe를 참조합니다: ${recipeId}` })
   }
+  const validateConfigurationChangeRecipe = (referenceName) => {
+    const recipeId = bundle.profile.recipes[referenceName]
+    if (!recipeId) return
+    const recipeIndex = bundle.recipes.findIndex(({ id }) => id === recipeId)
+    const recipe = recipesById.get(recipeId)
+    if (!recipe) return
+    if (recipe.kind !== RecipeKind.Configuration) issues.push({ path: `/profile/recipes/${referenceName}`, message: `표준 설정 변경은 configuration Recipe여야 합니다: ${recipeId}` })
+    if (!recipe.steps.some(({ type }) => type === RecipeStepType.WriteSingleRegister)) issues.push({ path: `/recipes/${recipeIndex}/steps`, message: `표준 설정 변경에는 writeSingleRegister Step이 필요합니다: ${recipeId}` })
+    const forbiddenStep = recipe.steps.find(({ type }) => [RecipeStepType.ReadHoldingRegisters, RecipeStepType.ReopenSerial, RecipeStepType.AssertEquals].includes(type))
+    if (forbiddenStep) issues.push({ path: `/recipes/${recipeIndex}/steps`, message: `표준 설정 변경 Recipe는 쓰기 후 연결·검증 Step을 포함할 수 없습니다: ${forbiddenStep.id}` })
+  }
+  validateConfigurationChangeRecipe('changeSlaveId')
+  validateConfigurationChangeRecipe('changeBaudRate')
   for (const actionId of (bundle.profile.recipes.actions || [])) {
     const action = recipesById.get(actionId)
-    if (!action || action.kind !== RecipeKind.Configuration) {
-      issues.push({ path: '/profile/recipes/actions', message: `추가 작업은 configuration Recipe만 참조할 수 있습니다: ${actionId}` })
+    if (!action) continue
+    const actionIndex = bundle.recipes.findIndex(({ id }) => id === actionId)
+    if ([bundle.profile.recipes.changeSlaveId, bundle.profile.recipes.changeBaudRate].includes(actionId)) {
+      issues.push({ path: '/profile/recipes/actions', message: `표준 통신 설정 변경 Recipe는 추가 작업으로 중복 공개할 수 없습니다: ${actionId}` })
+    }
+    if (action.steps.some(({ type }) => type === RecipeStepType.ReopenSerial)) {
+      issues.push({ path: `/recipes/${actionIndex}/steps`, message: `추가 작업은 Serial 연결을 다시 열 수 없습니다: ${actionId}` })
+    }
+    const hasRead = action.steps.some(({ type }) => type === RecipeStepType.ReadHoldingRegisters)
+    const hasWrite = action.steps.some(({ type }) => type === RecipeStepType.WriteSingleRegister)
+    if (action.kind === RecipeKind.Measurement) {
+      if (!hasRead || hasWrite || !(action.outputs && action.outputs.length)) {
+        issues.push({ path: '/profile/recipes/actions', message: `조회 추가 작업은 읽기 Step과 output이 있고 쓰기 Step이 없는 measurement Recipe여야 합니다: ${actionId}` })
+      }
       continue
     }
-    if (!action.steps.some(({ type }) => type === RecipeStepType.WriteSingleRegister)) {
+    if (action.kind === RecipeKind.Configuration && !hasWrite) {
       issues.push({ path: '/profile/recipes/actions', message: `추가 작업에는 writeSingleRegister Step이 필요합니다: ${actionId}` })
     }
   }
@@ -62,4 +90,4 @@ function validateCatalogBundleReferences(bundle) {
   return issues
 }
 
-module.exports = { RecipeKind, RecipeApplyMode, RecipeStepType, RecipeSchemaVersion, RecipeDecoderType, STANDARD_DEVICE_ID_PARAMETER, validateCatalogBundleReferences }
+module.exports = { RecipeKind, SerialParity, SerialFlowControl, RecipeApplyMode, RecipeStepType, RecipeRegisterEncodingType, RecipeSchemaVersion, RecipeDecoderType, STANDARD_DEVICE_ID_PARAMETER, validateCatalogBundleReferences }

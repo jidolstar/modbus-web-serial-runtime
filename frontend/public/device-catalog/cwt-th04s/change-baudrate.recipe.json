@@ -28,24 +28,6 @@
         "map": "baud-rate",
         "key": "${targetBaud}"
       }
-    },
-    {
-      "id": "wait-for-baud-application",
-      "type": "delay",
-      "milliseconds": 300
-    },
-    {
-      "id": "reopen-at-new-baudrate",
-      "type": "reopenSerial",
-      "baudRate": "${targetBaud}"
-    },
-    {
-      "id": "verify-new-baudrate",
-      "type": "readHoldingRegisters",
-      "slaveId": "${deviceId}",
-      "address": 0,
-      "count": 1,
-      "saveAs": "verificationRegisters"
     }
   ],
   "onError": "stop"

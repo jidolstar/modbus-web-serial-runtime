@@ -1,90 +1,49 @@
 import type { DeviceCatalog } from '../device-catalog/catalog.types'
-import { RecipeApplyMode, RecipeStepType, STANDARD_DEVICE_ID_PARAMETER } from '../device-catalog/recipe.types'
-import { ModbusExceptionError, ModbusTimeoutError } from '../modbus/modbus-errors'
-import { RecipeAbortedError, RecipeExecutionError } from '../recipe-engine/recipe-execution-errors'
+import { STANDARD_DEVICE_ID_PARAMETER } from '../device-catalog/recipe.types'
+import { ModbusExceptionError } from '../modbus/modbus-errors'
+import { RecipeExecutionError } from '../recipe-engine/recipe-execution-errors'
 import type { RecipeRunner } from '../recipe-engine/recipe-execution.types'
-import type { SerialTransport } from '../serial/serial-transport'
 import type { SerialConfig } from '../serial/serial-types'
-import { findErrorCause, OperationAbortedError, throwIfOperationAborted } from './operation-errors'
+import { findErrorCause, throwIfOperationAborted } from './operation-errors'
 
-/** 설정 변경의 검증 수준과 최종 장비 상태를 나타낸다. */
+/** 설정 쓰기 뒤 호출자가 수행해야 하는 수동 확인 절차를 구분한다. */
 export enum ConfigurationStatus {
-  Verified = 'verified',
-  PowerCycleRequired = 'power-cycle-required',
-  WriteFailed = 'write-failed',
-  VerificationFailed = 'verification-failed',
-  RecoveredOnPreviousConfig = 'recovered-on-previous-config',
-  DeviceStateUnknown = 'device-state-unknown',
+  ReconnectRequired = 'reconnect-required', // 쓰기 응답을 받았으며 새 설정으로 목표값 확인이 필요하다.
+  WriteRejected = 'write-rejected', // 장비가 Modbus exception으로 쓰기 요청을 명시적으로 거부했다.
+  DeliveryUncertain = 'delivery-uncertain', // timeout·분리 등으로 실제 적용 여부를 판단할 수 없다.
 }
 
-/** 사용자가 선택한 Catalog로 장비 설정을 변경하는 데 필요한 현재 연결 값이다. */
+/** 사용자가 선택한 Catalog와 현재 확인된 통신 설정이다. */
 export interface DeviceContext {
-  /** 장비 동작과 설정 Recipe를 제공하는 Profile ID다. */
-  readonly profileId: string
-
-  /** 현재 검증된 Modbus Slave ID다. */
-  readonly slaveId: number
-
-  /** 현재 검증된 Serial Port 설정이다. */
-  readonly serialConfig: SerialConfig
+  readonly profileId: string // 실행할 Profile ID. 예: "cwt-th04s"
+  readonly slaveId: number // 현재 확인된 Modbus 주소. 예: 1
+  readonly serialConfig: SerialConfig // 현재 확인된 Web Serial 설정. 예: 9600/8N1
 }
 
-/** 설정 변경 결과와 검증된 context를 boolean 대신 명시적으로 반환한다. */
+/** 설정 쓰기 결과이며 목표값은 재연결 검증 전까지 현재값으로 확정하지 않는다. */
 export interface ConfigurationResult {
-  /** 변경 및 사후 검증 결과의 명시적인 분류다. */
   readonly status: ConfigurationStatus
-
-  /** 변경 시도 전 검증된 장비 context다. */
   readonly previousContext: DeviceContext
-
-  /** 변경 후 확인된 context이며 상태를 특정할 수 없으면 null이다. */
-  readonly currentContext: DeviceContext | null
-
-  /** 전원 재인가 후 확인해야 할 목표 context다. 즉시 적용 장비에서는 생략한다. */
-  readonly pendingContext?: DeviceContext
-
-  /** 사용자가 수행해야 할 물리 작업이다. 예: "power-cycle-and-verify" */
-  readonly requiredAction?: 'power-cycle-and-verify'
-
-  /** Recipe가 실패했을 때 마지막으로 실행한 Step ID다. */
+  readonly pendingContext?: DeviceContext // 적용 가능성이 있을 때 사용자가 다시 확인할 목표 설정이다.
   readonly failedStepId?: string
-
-  /** 진단에 사용할 원본 실행 오류다. */
   readonly error?: Error
 }
 
-/** 측정 Recipe를 이용한 응답 확인 결과를 설정 workflow 내부에서만 사용한다. */
-enum ReachabilityOutcome {
-  Reachable = 'reachable',
-  NoResponse = 'no-response',
-  Failed = 'failed',
-}
-
-/** 응답 확인 결과와 원본 오류를 함께 보관한다. */
-interface ReachabilityResult {
-  readonly outcome: ReachabilityOutcome
-  readonly error?: Error
-}
-
-/** CWT Recipe가 사용하는 설정 변경 parameter 이름이다. */
-const CURRENT_ID_PARAMETER = 'currentId'
-const TARGET_ID_PARAMETER = 'targetId'
-const TARGET_BAUD_PARAMETER = 'targetBaud'
+const CURRENT_ID_PARAMETER = 'currentId' // Slave ID 변경 Recipe가 받는 현재 주소 parameter다.
+const TARGET_ID_PARAMETER = 'targetId' // Slave ID 변경 Recipe가 register에 기록할 목표 주소다.
+const TARGET_BAUD_PARAMETER = 'targetBaud' // baudrate map 조회에 사용하는 실제 통신 속도다.
 
 /**
- * Profile Recipe를 이용해 Slave ID와 baudrate를 변경하고 결과를 재검증한다.
- *
- * write 응답 손실은 실제 적용 여부를 보장하지 않으므로 새/이전 context의 응답을 확인한
- * 뒤에만 verified 또는 recovered 상태를 반환한다.
+ * Test Device 설정 화면이 호출해 표준 Slave ID 또는 baudrate 변경 Recipe를 한 번 실행한다.
+ * 적용 확인과 Serial 재연결은 수행하지 않으며, 호출자는 결과를 받은 뒤 현재 연결을 종료해야 한다.
  */
 export class DeviceConfigurator {
   public constructor(
     private readonly catalog: DeviceCatalog,
     private readonly recipeRunner: RecipeRunner,
-    private readonly serialTransport: SerialTransport,
   ) {}
 
-  /** Slave ID 충돌 여부를 확인하고 변경 후 새 ID 또는 기존 ID 상태를 검증한다. */
+  /** 현재값과 목표값을 검증한 뒤 Slave ID 쓰기 결과와 수동 확인 대상을 반환한다. */
   public async changeSlaveId(
     currentContext: DeviceContext,
     targetSlaveId: number,
@@ -97,71 +56,17 @@ export class DeviceConfigurator {
     this.#validateSlaveId(profile, targetSlaveId)
     throwIfOperationAborted(signal)
 
-    const currentReachability = await this.#checkReachability(currentContext, signal)
-    if (currentReachability.outcome !== ReachabilityOutcome.Reachable) {
-      return this.#result(
-        currentReachability.outcome === ReachabilityOutcome.NoResponse
-          ? ConfigurationStatus.VerificationFailed
-          : ConfigurationStatus.DeviceStateUnknown,
-        currentContext,
-        currentReachability.outcome === ReachabilityOutcome.NoResponse ? null : currentContext,
-        currentReachability.error,
-      )
-    }
-
-    const targetContext = Object.freeze({ ...currentContext, slaveId: targetSlaveId })
-    const targetBeforeWrite = await this.#checkReachability(targetContext, signal)
-    if (targetBeforeWrite.outcome === ReachabilityOutcome.Reachable) {
-      return this.#result(
-        ConfigurationStatus.VerificationFailed,
-        currentContext,
-        currentContext,
-        new Error(`목표 Slave ID ${targetSlaveId}에서 이미 장비 응답이 있습니다.`),
-      )
-    }
-    if (targetBeforeWrite.outcome === ReachabilityOutcome.Failed) {
-      return this.#result(
-        ConfigurationStatus.DeviceStateUnknown,
-        currentContext,
-        currentContext,
-        targetBeforeWrite.error,
-      )
-    }
-
-    const recipe = this.catalog.getRecipe(recipeId)
-    try {
-      await this.recipeRunner.execute(
-        profile.id,
-        recipeId,
-        { [CURRENT_ID_PARAMETER]: currentContext.slaveId, [TARGET_ID_PARAMETER]: targetSlaveId },
-        signal,
-      )
-      if (recipe.applyMode === RecipeApplyMode.AfterPowerCycle) {
-        // 브라우저는 장비 전원을 제어할 수 없으므로 현재 연결값은 확정하지 않고 사용자 조치로 넘긴다.
-        return this.#powerCycleRequiredResult(currentContext, targetContext)
-      }
-      return this.#result(ConfigurationStatus.Verified, currentContext, targetContext)
-    } catch (error) {
-      this.#throwIfCancelled(error, signal)
-      const failedStepId = error instanceof RecipeExecutionError ? error.stepId : undefined
-      if (findErrorCause(error, ModbusExceptionError)
-        && this.#failedStepIsWrite(recipeId, failedStepId)) {
-        return this.#result(ConfigurationStatus.WriteFailed, currentContext, currentContext, this.#toError(error), failedStepId)
-      }
-
-      const targetAfterWrite = await this.#checkReachability(targetContext, signal)
-      if (targetAfterWrite.outcome === ReachabilityOutcome.Reachable) {
-        return this.#result(ConfigurationStatus.Verified, currentContext, targetContext, this.#toError(error), failedStepId)
-      }
-      const previousAfterWrite = await this.#checkReachability(currentContext, signal)
-      if (previousAfterWrite.outcome === ReachabilityOutcome.Reachable) {
-        return this.#result(ConfigurationStatus.VerificationFailed, currentContext, currentContext, this.#toError(error), failedStepId)
-      }
-      return this.#result(ConfigurationStatus.DeviceStateUnknown, currentContext, null, this.#toError(error), failedStepId)
-    }
+    const pendingContext = Object.freeze({ ...currentContext, slaveId: targetSlaveId })
+    return this.#executeChange(
+      currentContext,
+      pendingContext,
+      recipeId,
+      { [CURRENT_ID_PARAMETER]: currentContext.slaveId, [TARGET_ID_PARAMETER]: targetSlaveId },
+      signal,
+    )
   }
 
-  /** Baudrate 변경 실패 시 이전 baud로 다시 열고 측정 Recipe 응답으로 복구 여부를 구분한다. */
+  /** 지원 목록을 확인한 뒤 baudrate 쓰기 결과와 수동 확인 대상을 반환한다. */
   public async changeBaudRate(
     currentContext: DeviceContext,
     targetBaudRate: number,
@@ -176,167 +81,63 @@ export class DeviceConfigurator {
     }
     throwIfOperationAborted(signal)
 
-    const currentReachability = await this.#checkReachability(currentContext, signal)
-    if (currentReachability.outcome !== ReachabilityOutcome.Reachable) {
-      return this.#result(
-        currentReachability.outcome === ReachabilityOutcome.NoResponse
-          ? ConfigurationStatus.VerificationFailed
-          : ConfigurationStatus.DeviceStateUnknown,
-        currentContext,
-        currentReachability.outcome === ReachabilityOutcome.NoResponse ? null : currentContext,
-        currentReachability.error,
-      )
-    }
-
-    const targetContext = Object.freeze({
+    const pendingContext = Object.freeze({
       ...currentContext,
       serialConfig: Object.freeze({ ...currentContext.serialConfig, baudRate: targetBaudRate }),
     })
-    const recipe = this.catalog.getRecipe(recipeId)
+    return this.#executeChange(
+      currentContext,
+      pendingContext,
+      recipeId,
+      { [STANDARD_DEVICE_ID_PARAMETER]: currentContext.slaveId, [TARGET_BAUD_PARAMETER]: targetBaudRate },
+      signal,
+    )
+  }
+
+  /**
+   * 장비 쓰기를 자동 재실행하지 않고 한 번만 수행한다.
+   * 응답 유실 뒤 실제 설정이 바뀔 수 있으므로 명시적 Modbus 거부 외 오류에는 pending 값을 보존한다.
+   */
+  async #executeChange(
+    previousContext: DeviceContext,
+    pendingContext: DeviceContext,
+    recipeId: string,
+    parameters: Readonly<Record<string, unknown>>,
+    signal?: AbortSignal,
+  ): Promise<ConfigurationResult> {
     try {
-      await this.recipeRunner.execute(
-        profile.id,
-        recipeId,
-        { [STANDARD_DEVICE_ID_PARAMETER]: currentContext.slaveId, [TARGET_BAUD_PARAMETER]: targetBaudRate },
-        signal,
-      )
-      if (recipe.applyMode === RecipeApplyMode.AfterPowerCycle) {
-        // 전원 재인가 전에는 기존 baudrate가 계속 유효하므로 reopen이나 새 설정 검증을 하지 않는다.
-        return this.#powerCycleRequiredResult(currentContext, targetContext)
+      await this.recipeRunner.execute(previousContext.profileId, recipeId, parameters, signal)
+      return Object.freeze({ status: ConfigurationStatus.ReconnectRequired, previousContext, pendingContext })
+    } catch (caught) {
+      const error = this.#toError(caught)
+      const failedStepId = caught instanceof RecipeExecutionError ? caught.stepId : undefined
+      if (findErrorCause(caught, ModbusExceptionError)) {
+        return Object.freeze({ status: ConfigurationStatus.WriteRejected, previousContext, failedStepId, error })
       }
-      return this.#result(ConfigurationStatus.Verified, currentContext, targetContext)
-    } catch (error) {
-      this.#throwIfCancelled(error, signal)
-      const failedStepId = error instanceof RecipeExecutionError ? error.stepId : undefined
-      if (findErrorCause(error, ModbusExceptionError)
-        && this.#failedStepIsWrite(recipeId, failedStepId)) {
-        return this.#result(ConfigurationStatus.WriteFailed, currentContext, currentContext, this.#toError(error), failedStepId)
-      }
-
-      const recoveryResult = await this.#recoverPreviousBaud(currentContext, signal)
-      if (recoveryResult.outcome === ReachabilityOutcome.Reachable) {
-        return this.#result(
-          ConfigurationStatus.RecoveredOnPreviousConfig,
-          currentContext,
-          currentContext,
-          this.#toError(error),
-          failedStepId,
-        )
-      }
-
-      // 이전 baud에서 찾지 못하면 새 baud를 한 번 확인해 응답 손실 뒤 적용된 경우를 복구한다.
-      const targetReachability = await this.#reopenAndCheckReachability(targetContext, signal)
-      if (targetReachability.outcome === ReachabilityOutcome.Reachable) {
-        return this.#result(ConfigurationStatus.Verified, currentContext, targetContext, this.#toError(error), failedStepId)
-      }
-      return this.#result(ConfigurationStatus.DeviceStateUnknown, currentContext, null, this.#toError(error), failedStepId)
+      return Object.freeze({
+        status: ConfigurationStatus.DeliveryUncertain,
+        previousContext,
+        pendingContext,
+        failedStepId,
+        error,
+      })
     }
   }
 
-  /** 지정 context 설정으로 port를 연 뒤 첫 측정 Recipe로 응답을 확인한다. */
-  async #reopenAndCheckReachability(context: DeviceContext, signal?: AbortSignal): Promise<ReachabilityResult> {
-    throwIfOperationAborted(signal)
-    try {
-      await this.serialTransport.reopen(context.serialConfig)
-    } catch (error) {
-      return Object.freeze({ outcome: ReachabilityOutcome.Failed, error: this.#toError(error) })
-    }
-    return this.#checkReachability(context, signal)
-  }
-
-  /** 이전 baudrate로 transport와 장비 응답을 함께 복구한다. */
-  #recoverPreviousBaud(context: DeviceContext, signal?: AbortSignal): Promise<ReachabilityResult> {
-    return this.#reopenAndCheckReachability(context, signal)
-  }
-
-  /** 첫 측정 Recipe를 읽기 전용 연결 확인으로 실행하고 timeout과 기타 실패를 구분한다. */
-  async #checkReachability(context: DeviceContext, signal?: AbortSignal): Promise<ReachabilityResult> {
-    throwIfOperationAborted(signal)
-    const profile = this.catalog.getProfile(context.profileId)
-    const verificationRecipeId = profile.recipes.measurements?.[0]
-    if (!verificationRecipeId) {
-      return Object.freeze({ outcome: ReachabilityOutcome.Failed, error: new Error(`연결 확인에 사용할 측정 Recipe가 없습니다: ${profile.id}`) })
-    }
-    try {
-      await this.recipeRunner.execute(
-        profile.id,
-        verificationRecipeId,
-        { [STANDARD_DEVICE_ID_PARAMETER]: context.slaveId },
-        signal,
-      )
-      return Object.freeze({ outcome: ReachabilityOutcome.Reachable })
-    } catch (error) {
-      this.#throwIfCancelled(error, signal)
-      if (findErrorCause(error, ModbusExceptionError)) {
-        return Object.freeze({ outcome: ReachabilityOutcome.Reachable, error: this.#toError(error) })
-      }
-      if (findErrorCause(error, ModbusTimeoutError)) {
-        return Object.freeze({ outcome: ReachabilityOutcome.NoResponse, error: this.#toError(error) })
-      }
-      return Object.freeze({ outcome: ReachabilityOutcome.Failed, error: this.#toError(error) })
-    }
-  }
-
-  /** 현재 DeviceContext가 Profile 범위와 일치하는지 확인한다. */
-  #validateContext(
-    profile: ReturnType<DeviceCatalog['getProfile']>,
-    context: DeviceContext,
-  ): void {
+  /** 현재 연결 context가 Profile 범위 안인지 장비 I/O 전에 검사한다. */
+  #validateContext(profile: ReturnType<DeviceCatalog['getProfile']>, context: DeviceContext): void {
     this.#validateSlaveId(profile, context.slaveId)
     if (!profile.serial.supportedBaudRates.includes(context.serialConfig.baudRate)) {
       throw new Error(`현재 baudrate가 Profile 지원 목록에 없습니다: ${context.serialConfig.baudRate}`)
     }
   }
 
-  /** Slave ID 정수 범위를 Profile 값으로 검사한다. */
   #validateSlaveId(profile: ReturnType<DeviceCatalog['getProfile']>, slaveId: number): void {
-    if (!Number.isInteger(slaveId)
-      || slaveId < profile.slave.minId
-      || slaveId > profile.slave.maxId) {
+    if (!Number.isInteger(slaveId) || slaveId < profile.slave.minId || slaveId > profile.slave.maxId) {
       throw new Error(`Slave ID는 ${profile.slave.minId}~${profile.slave.maxId} 정수여야 합니다.`)
     }
   }
 
-  /** 장비별 Step ID 문자열 대신 Recipe 정의의 Step type으로 write 실패를 판정한다. */
-  #failedStepIsWrite(recipeId: string, failedStepId?: string): boolean {
-    if (!failedStepId) return false
-    const failedStep = this.catalog.getRecipe(recipeId).steps.find((step) => step.id === failedStepId)
-    return failedStep?.type === RecipeStepType.WriteSingleRegister
-  }
-
-  /** AbortSignal과 Recipe 취소 오류를 동일한 application 취소 오류로 변환한다. */
-  #throwIfCancelled(error: unknown, signal?: AbortSignal): void {
-    if (signal?.aborted || error instanceof RecipeAbortedError || error instanceof OperationAbortedError) {
-      throw new OperationAbortedError('장비 설정 변경이 취소되었습니다.', { cause: error })
-    }
-  }
-
-  /** ConfigurationResult를 외부 변경이 불가능한 객체로 만든다. */
-  #result(
-    status: ConfigurationStatus,
-    previousContext: DeviceContext,
-    currentContext: DeviceContext | null,
-    error?: Error,
-    failedStepId?: string,
-  ): ConfigurationResult {
-    return Object.freeze({ status, previousContext, currentContext, error, failedStepId })
-  }
-
-  /** 전원 재인가형 Recipe가 성공했을 때 호출자에게 현재값과 확인 대기값을 함께 돌려준다. */
-  #powerCycleRequiredResult(
-    currentContext: DeviceContext,
-    pendingContext: DeviceContext,
-  ): ConfigurationResult {
-    return Object.freeze({
-      status: ConfigurationStatus.PowerCycleRequired,
-      previousContext: currentContext,
-      currentContext,
-      pendingContext,
-      requiredAction: 'power-cycle-and-verify' as const,
-    })
-  }
-
-  /** unknown catch 값을 Error로 정규화한다. */
   #toError(error: unknown): Error {
     return error instanceof Error ? error : new Error(String(error))
   }

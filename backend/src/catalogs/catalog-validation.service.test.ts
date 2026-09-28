@@ -70,15 +70,31 @@ describe('CatalogValidationService', () => {
     assert.throws(() => validator.validate(invalidBundle), CatalogError)
   })
 
-  it('추가 작업 allowlist가 measurement Recipe를 공개하면 거부한다', () => {
-    const invalidBundle = cloneJson(catalogBundle) as unknown as { profile: { recipes: { actions: string[]; measurements: string[] } } }
-    invalidBundle.profile.recipes.actions = [invalidBundle.profile.recipes.measurements[0]]
-    assert.throws(() => validator.validate(invalidBundle), CatalogError)
+  it('output이 있는 읽기 전용 measurement Recipe를 추가 작업 allowlist로 저장할 수 있다', () => {
+    const validBundle = cloneJson(catalogBundle) as unknown as { profile: { recipes: { actions: string[]; measurements: string[] } } }
+    validBundle.profile.recipes.actions = [validBundle.profile.recipes.measurements[0]]
+    assert.equal(validator.validate(validBundle).profile.recipes.actions?.length, 1)
   })
 
   it('write configuration Recipe를 추가 작업 allowlist로 저장할 수 있다', () => {
-    const validBundle = cloneJson(catalogBundle) as unknown as { profile: { recipes: { actions: string[]; changeSlaveId: string } } }
-    validBundle.profile.recipes.actions = [validBundle.profile.recipes.changeSlaveId]
+    const validBundle = cloneJson(catalogBundle) as unknown as { profile: { recipes: { actions: string[]; changeSlaveId: string } }; recipes: Array<{ id: string }> }
+    const source = validBundle.recipes.find(({ id }) => id === validBundle.profile.recipes.changeSlaveId)!
+    const action = { ...source, id: 'cwt-th04s.write-safe-setting' }
+    validBundle.recipes.push(action)
+    validBundle.profile.recipes.actions = [action.id]
     assert.equal(validator.validate(validBundle).profile.recipes.actions?.length, 1)
+  })
+
+  it('표준 통신 설정 Recipe를 추가 작업으로 중복 공개하면 거부한다', () => {
+    const invalidBundle = cloneJson(catalogBundle) as unknown as { profile: { recipes: { actions: string[]; changeSlaveId: string } } }
+    invalidBundle.profile.recipes.actions = [invalidBundle.profile.recipes.changeSlaveId]
+    assert.throws(() => validator.validate(invalidBundle), CatalogError)
+  })
+
+  it('표준 설정 변경 Recipe 안의 자동 읽기 검증을 거부한다', () => {
+    const invalidBundle = cloneJson(catalogBundle) as unknown as { profile: { recipes: { changeSlaveId: string } }; recipes: Array<{ id: string; steps: Array<Record<string, unknown>> }> }
+    const recipe = invalidBundle.recipes.find(({ id }) => id === invalidBundle.profile.recipes.changeSlaveId)
+    recipe?.steps.push({ id: 'automatic-verification', type: 'readHoldingRegisters', slaveId: '${targetId}', address: 0, count: 1, saveAs: 'registers' })
+    assert.throws(() => validator.validate(invalidBundle), CatalogError)
   })
 })

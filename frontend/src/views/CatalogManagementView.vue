@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { catalogApi, CatalogApiError, type CatalogSummary } from '../device-catalog/catalog-api'
+import type { TestDevice } from '../application/test-device'
+import { testBusSession } from '../application/test-bus-session'
+import { catalogApi, CatalogApiError, type CatalogDetail, type CatalogSummary } from '../device-catalog/catalog-api'
 import type { AppRoute } from '../device-catalog/catalog-route'
 import CatalogCard from '../features/catalogs/CatalogCard.vue'
+import TestDeviceFormModal from '../features/test-device/TestDeviceFormModal.vue'
 
 const emit = defineEmits<{ navigate: [route: AppRoute] }>()
 const props = withDefaults(defineProps<{ readonly search?: string }>(), { search: '' })
@@ -12,6 +15,7 @@ const query = ref(props.search)
 const loading = ref(false)
 const listFailed = ref(false)
 const notice = ref<string | null>(null)
+const connectionCatalog = ref<CatalogDetail | null>(null)
 const canReset = computed(() => Boolean(query.value.trim() || props.search))
 
 function publicError(error: unknown): string {
@@ -46,6 +50,23 @@ function resetSearch(): void {
   emit('navigate', { page: 'catalog-list' })
 }
 
+/** 목록 카드의 연결 버튼에서 실행 정의 전체를 불러온 뒤 공용 연결 설정 모달을 연다. */
+async function prepareDeviceConnection(catalog: CatalogSummary): Promise<void> {
+  notice.value = null
+  try { connectionCatalog.value = await catalogApi.get(catalog.catalogKey) }
+  catch (error) { notice.value = publicError(error) }
+}
+
+/** 연결 설정과 port 선택이 끝나면 기존 Test Device route로 이동해 측정을 시작한다. */
+function openTestDevice(device: TestDevice): void {
+  connectionCatalog.value = null
+  emit('navigate', {
+    page: 'test-device', name: device.name, catalogKey: device.catalogKey,
+    catalogRevision: device.catalogRevision, baudRate: device.serialConfig.baudRate,
+    slaveId: device.slaveId, origin: device.origin,
+  })
+}
+
 onMounted(loadCatalogs)
 watch(() => props.search, (search) => { query.value = search; void loadCatalogs() })
 </script>
@@ -61,8 +82,9 @@ watch(() => props.search, (search) => { query.value = search; void loadCatalogs(
     <span>총 {{ total }}개</span>
   </section>
   <section v-if="catalogs.length" class="catalog-grid" aria-label="카탈로그 목록">
-    <CatalogCard v-for="catalog in catalogs" :key="catalog.catalogKey" :catalog="catalog" @view="emit('navigate', { page: 'catalog-view', catalogKey: catalog.catalogKey })" />
+    <CatalogCard v-for="catalog in catalogs" :key="catalog.catalogKey" :catalog="catalog" @connect="prepareDeviceConnection(catalog)" @view="emit('navigate', { page: 'catalog-view', catalogKey: catalog.catalogKey })" />
   </section>
   <p v-else-if="!loading && !listFailed" class="empty-panel surface-card">검색 조건에 맞는 카탈로그가 없습니다.</p>
   <p v-else-if="listFailed" class="empty-panel surface-card">목록을 불러오지 못했습니다. 다시 시도해 주세요.</p>
+  <TestDeviceFormModal v-if="connectionCatalog" :open="true" :catalogs="[connectionCatalog]" :initial-catalog-key="connectionCatalog.catalogKey" :prepare-connection="() => testBusSession.requestPort()" catalog-locked origin="catalog" @cancel="connectionCatalog = null" @save="openTestDevice" />
 </template>

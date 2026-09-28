@@ -41,10 +41,17 @@ class RecordingSensorMonitor implements SensorMonitorControl {
   public readonly starts: SensorMonitorRequest[] = []
   public stopCount = 0
   public observer: SensorMonitorObserver | null = null
+  public measureOnceError: Error | null = null
 
   public start(request: SensorMonitorRequest, observer: SensorMonitorObserver): void {
     this.starts.push(request)
     this.observer = observer
+  }
+
+  public async measureOnce(request: SensorMonitorRequest): Promise<RecipeExecutionResult> {
+    this.starts.push(request)
+    if (this.measureOnceError) throw this.measureOnceError
+    return Object.freeze({ recipeId: request.recipeId, status: RecipeExecutionStatus.Succeeded, steps: Object.freeze([]), outputs: Object.freeze({}), context: Object.freeze({}) })
   }
 
   public stop(): void { this.stopCount += 1 }
@@ -160,6 +167,30 @@ describe('DynamicDeviceRuntime', () => {
     await runtime.connect({ profileId: 'cwt-th04s', slaveId: 1, baudRate: 4800 })
 
     expect(() => runtime.selectMeasurement('unlisted.recipe')).toThrow(/허용하지 않는 측정 Recipe/)
+    expect(monitor.starts).toHaveLength(1)
+  })
+
+  it('수동 재연결은 목표 설정의 첫 측정 성공 뒤 polling을 시작한다', async () => {
+    const transport = new MockSerialTransport()
+    const monitor = new RecordingSensorMonitor()
+    const runtime = new DynamicDeviceRuntime(new RuntimeTestCatalog(createProfile()), transport, monitor)
+
+    await runtime.connectAndVerify({ profileId: 'cwt-th04s', slaveId: 7, baudRate: 4_800 })
+
+    expect(runtime.snapshot.lastUpdatedAt).toBeInstanceOf(Date)
+    expect(runtime.snapshot.activeDevice?.slaveId).toBe(7)
+    expect(monitor.starts).toHaveLength(2)
+  })
+
+  it('수동 재연결의 첫 측정이 실패하면 polling을 시작하지 않고 오류를 반환한다', async () => {
+    const transport = new MockSerialTransport()
+    const monitor = new RecordingSensorMonitor()
+    monitor.measureOnceError = new Error('first measurement failed')
+    const runtime = new DynamicDeviceRuntime(new RuntimeTestCatalog(createProfile()), transport, monitor)
+
+    await expect(runtime.connectAndVerify({ profileId: 'cwt-th04s', slaveId: 7, baudRate: 4_800 }))
+      .rejects.toThrow(/first measurement failed/)
+    expect(runtime.snapshot.lastUpdatedAt).toBeNull()
     expect(monitor.starts).toHaveLength(1)
   })
 

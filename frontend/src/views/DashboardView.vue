@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
 import type { AuthUser } from '../auth/auth-api'
+import ScanIcon from '../components/ScanIcon.vue'
 import { parseAppRoute, routeUrl, type AppRoute } from '../device-catalog/catalog-route'
 import AppShell from '../layout/AppShell.vue'
 import CatalogDetailView from './CatalogDetailView.vue'
@@ -8,13 +9,17 @@ import CatalogEditorView from './CatalogEditorView.vue'
 import CatalogManagementView from './CatalogManagementView.vue'
 import DeviceScanView from './DeviceScanView.vue'
 import TestDeviceView from './TestDeviceView.vue'
+import TestGroupListView from './TestGroupListView.vue'
+import TestGroupEditorView from './TestGroupEditorView.vue'
+import TestGroupRunView from './TestGroupRunView.vue'
 import { testBusSession } from '../application/test-bus-session'
 
 defineProps<{ readonly user: AuthUser; readonly isLoggingOut: boolean }>()
 defineEmits<{ logout: [] }>()
 const route = ref<AppRoute>(parseAppRoute())
-const activeSection = computed<'dashboard' | 'catalogs' | 'scan'>(() => {
+const activeSection = computed<'dashboard' | 'catalogs' | 'scan' | 'test-groups'>(() => {
   if (route.value.page === 'dashboard') return 'dashboard'
+  if (route.value.page.startsWith('test-group')) return 'test-groups'
   return route.value.page === 'scan' ? 'scan' : 'catalogs'
 })
 const catalogEditRoute = computed(() => {
@@ -26,18 +31,28 @@ const catalogEditRoute = computed(() => {
   return null
 })
 
-/** Sidebar와 Catalog 하위 화면에서 호출해 History와 렌더링 route를 동시에 변경한다. */
-function navigate(nextRoute: AppRoute): void {
+/**
+ * Sidebar와 하위 화면에서 호출해 기존 Serial 연결을 닫은 뒤 History와 화면을 변경한다.
+ * close를 기다려 다음 화면이 같은 물리 port를 여는 시점과 이전 stream 정리가 겹치지 않게 한다.
+ */
+async function navigate(nextRoute: AppRoute): Promise<void> {
   const nextUrl = routeUrl(nextRoute)
-  if (`${window.location.pathname}${window.location.search}` !== nextUrl) window.history.pushState(null, '', nextUrl)
+  if (`${window.location.pathname}${window.location.search}` === nextUrl) return
+  await testBusSession.close()
+  window.history.pushState(null, '', nextUrl)
   route.value = nextRoute
   window.scrollTo({ top: 0, behavior: 'auto' })
 }
-function handleShellNavigation(section: 'dashboard' | 'catalogs' | 'scan'): void {
+function handleShellNavigation(section: 'dashboard' | 'catalogs' | 'scan' | 'test-groups'): void {
   if (section === 'dashboard') navigate({ page: 'dashboard' })
+  else if (section === 'test-groups') navigate({ page: 'test-group-list' })
   else navigate(section === 'scan' ? { page: 'scan' } : { page: 'catalog-list' })
 }
-function handlePopState(): void { route.value = parseAppRoute() }
+/** 브라우저 뒤로가기에서도 이전 화면의 port 정리가 끝난 다음 대상 화면을 렌더링한다. */
+async function handlePopState(): Promise<void> {
+  await testBusSession.close()
+  route.value = parseAppRoute()
+}
 window.addEventListener('popstate', handlePopState)
 onBeforeUnmount(() => { window.removeEventListener('popstate', handlePopState); void testBusSession.close() })
 </script>
@@ -45,21 +60,25 @@ onBeforeUnmount(() => { window.removeEventListener('popstate', handlePopState); 
   <AppShell :user="user" :is-logging-out="isLoggingOut" :active-section="activeSection" @navigate="handleShellNavigation" @logout="$emit('logout')">
     <template v-if="route.page === 'dashboard'">
       <header class="page-heading">
-      <div><p class="eyebrow">DEVICE OPERATIONS</p><h1>장비 대시보드</h1><p class="description">연결 상태와 실시간 측정값을 한곳에서 확인합니다.</p></div>
+      <div><p class="eyebrow">MODBUS DEVICE TOOL</p><h1>RS485 Modbus RTU 장비를 브라우저에서 관리하세요</h1><p class="description">브라우저에서 USB Serial을 통해 RS485 Modbus RTU 장비를 탐색하고, 테스트하고, 설정하는 도구입니다.</p></div>
       <span class="page-date">브라우저 로컬 실행</span>
       </header>
-      <section class="summary-grid" aria-label="시스템 요약">
-      <article class="summary-card"><span class="summary-icon blue" aria-hidden="true">▦</span><div><span>장비 카탈로그</span><strong>DB 연동</strong><small>활성 Catalog를 실행에 사용합니다.</small></div></article>
-      <article class="summary-card"><span class="summary-icon green" aria-hidden="true">⌁</span><div><span>통신 실행 위치</span><strong>이 브라우저</strong><small>장비 데이터는 로컬에서 처리됩니다.</small></div></article>
-      <article class="summary-card"><span class="summary-icon amber" aria-hidden="true">◉</span><div><span>테스트 방식</span><strong>Catalog 기반</strong><small>장비별 측정 Recipe를 실행합니다.</small></div></article>
+      <section class="summary-grid" aria-label="주요 기능">
+      <article class="summary-card"><span class="summary-icon blue" aria-hidden="true"><ScanIcon /></span><div><span>장비 탐색</span><strong>Modbus Scan</strong><small>USB Serial에 연결된 RS485 장비를 찾습니다.</small></div></article>
+      <article class="summary-card"><span class="summary-icon green" aria-hidden="true">◉</span><div><span>장비 테스트</span><strong>Catalog 기반 실행</strong><small>장비별 Recipe로 측정과 동작을 확인합니다.</small></div></article>
+      <article class="summary-card"><span class="summary-icon amber" aria-hidden="true">⚙</span><div><span>장비 설정</span><strong>브라우저에서 직접</strong><small>지원되는 장비 설정을 로컬 통신으로 변경합니다.</small></div></article>
       </section>
-      <section class="surface-card dashboard-start"><div><p class="eyebrow">GET STARTED</p><h2>테스트 장비를 만들어 시작하세요</h2><p class="description">장비 모델을 알고 있다면 Catalog에서 만들고, 통신값을 모르면 먼저 Scan을 실행합니다.</p></div><div class="inline-actions"><button class="button button-primary" type="button" @click="navigate({ page: 'catalog-list' })">Catalog 선택</button><button class="button button-ghost" type="button" @click="navigate({ page: 'scan' })">장비 Scan</button></div></section>
+      <section class="surface-card dashboard-start"><div><p class="eyebrow">GET STARTED</p><h2>연결할 장비에 맞는 방법으로 시작하세요</h2><p class="description">장비 모델과 통신 설정을 알고 있다면 Catalog를 선택하고, 알 수 없다면 먼저 장비 Scan을 실행합니다.</p></div><div class="inline-actions"><button class="button button-primary" type="button" @click="navigate({ page: 'catalog-list' })">장비 Catalog 보기</button><button class="button button-ghost" type="button" @click="navigate({ page: 'scan' })">장비 Scan 시작</button></div></section>
     </template>
     <CatalogManagementView v-else-if="route.page === 'catalog-list'" :search="route.search" @navigate="navigate" />
     <CatalogDetailView v-else-if="route.page === 'catalog-view'" :catalog-key="route.catalogKey" @navigate="navigate" />
     <CatalogEditorView v-else-if="catalogEditRoute" :mode="catalogEditRoute.mode" :catalog-key="catalogEditRoute.catalogKey" @navigate="navigate" />
     <DeviceScanView v-else-if="route.page === 'scan'" @navigate="navigate" />
     <TestDeviceView v-else-if="route.page === 'test-device'" :route="route" @navigate="navigate" />
+    <TestGroupListView v-else-if="route.page === 'test-group-list'" @navigate="navigate" />
+    <TestGroupEditorView v-else-if="route.page === 'test-group-add'" @navigate="navigate" />
+    <TestGroupEditorView v-else-if="route.page === 'test-group-edit'" :group-id="route.groupId" @navigate="navigate" />
+    <TestGroupRunView v-else-if="route.page === 'test-group-run'" :group-id="route.groupId" @navigate="navigate" />
     <CatalogEditorView v-else-if="route.page === 'catalog-add'" mode="add" :observed-baud-rate="route.observedBaudRate" :observed-slave-id="route.observedSlaveId" @navigate="navigate" />
   </AppShell>
 </template>

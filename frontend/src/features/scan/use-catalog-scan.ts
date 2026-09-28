@@ -1,9 +1,7 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { CatalogAwareScanner, CatalogScanStage, CatalogScanStatus, STANDARD_MODBUS_BAUD_RATES, type CatalogScanResult } from '../../application/catalog-aware-scanner'
 import { OperationAbortedError } from '../../application/operation-errors'
-import { RUNTIME_CONFIG } from '../../application/runtime-config'
-import { ModbusRtuClient } from '../../modbus/modbus-rtu-client'
-import { WebSerialTransport } from '../../serial/web-serial-transport'
+import { testBusSession } from '../../application/test-bus-session'
 
 const DEFAULT_SLAVE_ID_START = 1 // 첫 화면에서 과도한 전수 탐색을 피하기 위한 시작값. 예: 1
 const DEFAULT_SLAVE_ID_END = 10 // 사용자가 필요할 때 247까지 확장할 수 있는 초기 종료값. 예: 10
@@ -12,10 +10,9 @@ const STATUS_LABELS: Readonly<Record<CatalogScanStatus, string>> = Object.freeze
   [CatalogScanStatus.Discovered]: '응답 확인',
 })
 
-/** Scan 화면이 Catalog 로드, Web Serial 수명주기와 진행 상태를 Vue 상태로 연결한다. */
+/** Scan 화면이 공유 TestBusSession의 Web Serial 수명주기와 진행 상태를 Vue 상태로 연결한다. */
 export function useCatalogScan() {
-  const transport = new WebSerialTransport()
-  const modbusClient = new ModbusRtuClient(transport, RUNTIME_CONFIG.modbusTransactionTimeoutMs)
+  const { transport, modbusClient } = testBusSession
   const scanner = new CatalogAwareScanner(transport, modbusClient)
   const availableBaudRates = STANDARD_MODBUS_BAUD_RATES
   const selectedBaudRates = ref<number[]>([4_800, 9_600, 19_200])
@@ -58,7 +55,7 @@ export function useCatalogScan() {
     currentSlaveId.value = null
     abortController = new AbortController()
     try {
-      await transport.requestPort()
+      await testBusSession.requestPort()
       const slaveIds = Array.from({ length: slaveIdEnd.value - slaveIdStart.value + 1 }, (_, index) => slaveIdStart.value + index)
       results.value = await scanner.scan(
         { baudRates: selectedBaudRates.value, slaveIds },
@@ -84,7 +81,7 @@ export function useCatalogScan() {
       else if (error instanceof DOMException && error.name === 'NotFoundError') errorMessage.value = 'Serial Port 선택을 취소했습니다.'
       else errorMessage.value = error instanceof Error ? error.message : '장비 스캔을 완료하지 못했습니다.'
     } finally {
-      await transport.close().catch(() => undefined)
+      await testBusSession.close().catch(() => undefined)
       abortController = null
       scanning.value = false
     }
@@ -95,8 +92,7 @@ export function useCatalogScan() {
 
   onBeforeUnmount(() => {
     abortController?.abort('화면 이동')
-    modbusClient.dispose()
-    void transport.dispose()
+    void testBusSession.close()
   })
 
   return {

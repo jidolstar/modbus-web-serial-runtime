@@ -32,6 +32,9 @@ services:
       target: development
     env_file:
       - ../.env
+    environment:
+      # Windows Docker bind mount는 새 파일 생성 이벤트를 놓칠 수 있어 TypeScript가 주기적으로 변경을 확인한다.
+      TSC_WATCHFILE: DynamicPriorityPolling
     expose:
       - "3000"
     volumes:

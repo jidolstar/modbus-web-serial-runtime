@@ -147,10 +147,8 @@ describe('RecipeExecutor', () => {
     expect(modbusClient.reads).toHaveLength(0)
   })
 
-  it('Profile map을 적용해 baudrate register를 쓰고 port를 다시 연 뒤 응답을 확인한다', async () => {
+  it('Profile map을 적용해 baudrate register만 쓰고 재접속은 호출자에게 남긴다', async () => {
     const baudRecipe = cloneJson(changeBaudRateRecipeJson)
-    const delayStep = baudRecipe.steps.find((step) => step.type === 'delay')
-    if (delayStep?.type === 'delay') delayStep.milliseconds = 0
     const validator = new DeviceProfileValidator()
     const profile = validator.validateDeviceProfile(cloneJson(profileJson), 'profile.json')
     const recipes = [baudRecipe].map((recipe, index) => (
@@ -171,9 +169,28 @@ describe('RecipeExecutor', () => {
     )
 
     expect(modbusClient.writes).toEqual([[100, 2001, 2]])
-    expect(serialTransport.reopenCalls[0].baudRate).toBe(9600)
-    expect(modbusClient.reads).toEqual([[100, 0, 1]])
-    expect(result.steps).toHaveLength(4)
+    expect(serialTransport.reopenCalls).toEqual([])
+    expect(modbusClient.reads).toEqual([])
+    expect(result.steps).toHaveLength(1)
+  })
+
+  it('int16 쓰기 입력을 FC06용 2의 보수 register 값으로 변환한다', async () => {
+    const signedWriteRecipe = {
+      schemaVersion: '1.0', id: 'cwt-th04s.write-signed-offset', name: 'signed 보정값 쓰기', kind: 'configuration',
+      parameters: [
+        { name: 'deviceId', type: 'integer', minimum: 1, maximum: 247 },
+        { name: 'offset', type: 'integer', minimum: -1000, maximum: 1000 },
+      ],
+      steps: [{ id: 'write-offset', type: 'writeSingleRegister', slaveId: '${deviceId}', address: 107, value: '${offset}', encode: { type: 'int16' } }],
+      onError: 'stop',
+    }
+    const { profile, recipes } = createValidatedFixtures([signedWriteRecipe])
+    const modbusClient = new RecordingModbusClient()
+    const executor = new RecipeExecutor(new MemoryDeviceCatalog(profile, recipes), modbusClient, createSerialTransport())
+
+    await executor.execute('cwt-th04s', signedWriteRecipe.id, { deviceId: 1, offset: -100 })
+
+    expect(modbusClient.writes).toEqual([[1, 107, 0xff9c]])
   })
 
   it('delay 중 AbortSignal이 취소되면 다음 Step을 실행하지 않는다', async () => {

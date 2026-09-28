@@ -16,6 +16,7 @@ const device = ref<TestDevice | null>(null)
 const errorMessage = ref<string | null>(null)
 const editorOpen = ref(false)
 const connectionActive = ref(false)
+const configurationPending = ref(false)
 const connecting = ref(false)
 const runtimePanel = ref<RuntimePanel | null>(null)
 
@@ -61,13 +62,13 @@ onMounted(load)
 </script>
 
 <template>
-  <header class="page-heading detail-page-heading"><div><button class="text-link" type="button" @click="emit('navigate', { page: 'catalog-view', catalogKey: route.catalogKey })">← Catalog로</button><p class="eyebrow">TEST DEVICE</p><h1>{{ device?.name ?? '테스트 장비' }}</h1><p class="description">Catalog가 정의한 측정값을 브라우저에서 주기적으로 확인합니다.</p></div><div v-if="device" class="page-heading-actions"><button class="button button-ghost" type="button" @click="editorOpen = true">테스트 장비 수정</button><button v-if="!connectionActive" class="button button-primary" type="button" :disabled="connecting" @click="connectBus(false)">{{ connecting ? '연결 중…' : '테스트 버스 연결' }}</button><button v-else class="button button-secondary" type="button" @click="disconnectBus">테스트 버스 연결 해제</button></div></header>
+  <header class="page-heading detail-page-heading"><div><button class="text-link" type="button" @click="emit('navigate', { page: 'catalog-view', catalogKey: route.catalogKey })">← Catalog로</button><p class="eyebrow">DEVICE CONNECTION</p><h1>{{ device?.name ?? '테스트 장비' }}</h1><p class="description">Catalog가 정의한 측정값을 브라우저에서 주기적으로 확인합니다.</p></div><div v-if="device" class="page-heading-actions"><button class="button button-ghost" type="button" :disabled="configurationPending" @click="editorOpen = true">카탈로그 수정</button><button v-if="!connectionActive" class="button button-primary" type="button" :disabled="connecting || configurationPending" @click="connectBus(false)">{{ connecting ? '연결 중…' : '테스트 버스 연결' }}</button><button v-else class="button button-secondary" type="button" @click="disconnectBus">COM 포트 연결 끊기</button></div></header>
   <p v-if="errorMessage" class="notice error">{{ errorMessage }}</p>
   <section v-else-if="device && catalog" class="surface-card test-device-summary">
     <div><span>Catalog</span><strong>{{ catalog.title }}</strong><small>{{ catalog.manufacturer }} · {{ catalog.model }} · revision {{ catalog.revision }}</small></div>
     <div><span>Baudrate</span><strong>{{ device.serialConfig.baudRate.toLocaleString() }}</strong><small>{{ device.serialConfig.dataBits }}{{ device.serialConfig.parity.charAt(0).toUpperCase() }}{{ device.serialConfig.stopBits }}</small></div>
     <div><span>Slave ID</span><strong>{{ device.slaveId }}</strong><small>{{ device.origin === 'scan' ? 'Scan 결과에서 생성' : 'Catalog에서 생성' }}</small></div>
   </section>
-  <TestDeviceRuntimePanel v-if="device && catalog" ref="runtimePanel" :device="device" :catalog="catalog" @connection-change="connectionActive = $event" @device-change="applyRuntimeDevice" />
+  <TestDeviceRuntimePanel v-if="device && catalog" ref="runtimePanel" :device="device" :catalog="catalog" @connection-change="connectionActive = $event" @configuration-pending="configurationPending = $event" @device-change="applyRuntimeDevice" />
   <TestDeviceFormModal v-if="catalog && device" :open="editorOpen" :catalogs="[catalog]" :initial-device="device" :connection-active="connectionActive" catalog-locked @cancel="editorOpen = false" @save="save" />
 </template>

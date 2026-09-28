@@ -1,6 +1,6 @@
 import { computed, onBeforeUnmount, onMounted, ref, type Ref } from 'vue'
 import { DynamicDeviceRuntime, type DeviceRuntimeSnapshot } from '../../application/dynamic-device-runtime'
-import { ConfigurationStatus, DeviceConfigurator, type ConfigurationResult } from '../../application/device-configurator'
+import { ConfigurationStatus, DeviceConfigurator, type ConfigurationResult, type DeviceContext } from '../../application/device-configurator'
 import { DeviceActionRunner } from '../../application/device-action-runner'
 import { RUNTIME_CONFIG } from '../../application/runtime-config'
 import { SensorMonitor } from '../../application/sensor-monitor'
@@ -12,6 +12,21 @@ import { ModbusExceptionError, ModbusTimeoutError } from '../../modbus/modbus-er
 import { RecipeAbortedError, RecipeExecutionError } from '../../recipe-engine/recipe-execution-errors'
 import { SerialConnectionState } from '../../serial/serial-connection-state'
 import { findErrorCause, OperationAbortedError } from '../../application/operation-errors'
+
+/** 설정 write 뒤 장비별 적용 절차와 목표값 검증을 기다리는 Test Device 화면 상태다. */
+export interface PendingConfiguration {
+  readonly kind: 'slaveId' | 'baudRate'
+  readonly targetContext: DeviceContext
+  readonly delivery: 'acknowledged' | 'uncertain'
+}
+
+/** test-device의 각 action 카드가 독립적으로 표시하는 최근 실행 상태다. */
+export interface DeviceActionState {
+  readonly status: 'running' | 'succeeded' | 'failed'
+  readonly outputs: ReadonlyArray<{ readonly name: string; readonly displayValue: string; readonly unit?: string }>
+  readonly message?: string
+  readonly completedAt?: string
+}
 
 const CONNECTION_LABELS: Readonly<Record<SerialConnectionState, string>> = Object.freeze({
   [SerialConnectionState.Idle]: '연결 안 됨', [SerialConnectionState.RequestingPort]: '포트 선택 중',
@@ -42,8 +57,10 @@ export function useTestDeviceRuntime(
   const operationBusy = ref(false)
   const operationMessage = ref<string | null>(null)
   const operationError = ref<string | null>(null)
+  const actionStates = ref<Readonly<Record<string, DeviceActionState>>>(Object.freeze({}))
+  const pendingConfiguration = ref<PendingConfiguration | null>(null)
   let operationController: AbortController | null = null
-  const configurator = new DeviceConfigurator(deviceCatalog, recipeExecutor, serialTransport)
+  const configurator = new DeviceConfigurator(deviceCatalog, recipeExecutor)
   const actionRunner = new DeviceActionRunner(deviceCatalog, recipeExecutor)
 
   const unsubscribeRuntime = runtime.subscribe((next) => { snapshot.value = next })
@@ -63,9 +80,13 @@ export function useTestDeviceRuntime(
   })
   const lastUpdatedAt = computed(() => snapshot.value.lastUpdatedAt?.toLocaleTimeString('ko-KR') ?? null)
 
+  function setActionState(recipeId: string, state: DeviceActionState): void {
+    actionStates.value = Object.freeze({ ...actionStates.value, [recipeId]: Object.freeze(state) })
+  }
+
   /** 상위 TestBusSession이 선택한 공유 port를 현재 Test Device 설정으로 열고 polling을 시작한다. */
   async function connect(): Promise<void> {
-    if (!serialTransport.isSupported || isConnected.value || isTransitioning.value) return
+    if (!serialTransport.isSupported || isConnected.value || isTransitioning.value || pendingConfiguration.value) return
     try {
       await runtime.connect({ profileId: device.value.catalogKey, slaveId: device.value.slaveId, baudRate: device.value.serialConfig.baudRate, measurementRecipeId: selectedRecipeId.value, requestPort: false })
     } catch { /* Runtime snapshot이 공개 오류를 보관하므로 UI event에서 재전파하지 않는다. */ }
@@ -80,23 +101,27 @@ export function useTestDeviceRuntime(
     try { runtime.selectMeasurement(selectedRecipeId.value) } catch { /* Runtime allowlist 검증 실패 시 기존 연결을 유지한다. */ }
   }
 
-  function applyConfigurationResult(result: ConfigurationResult): void {
-    const labels: Readonly<Record<ConfigurationStatus, string>> = {
-      [ConfigurationStatus.Verified]: '새 설정에서 장비 응답을 확인했습니다.',
-      [ConfigurationStatus.PowerCycleRequired]: '쓰기 완료. 장비 전원을 다시 켠 뒤 새 설정을 확인해 주세요.',
-      [ConfigurationStatus.WriteFailed]: '장비가 쓰기 요청을 거부했습니다.',
-      [ConfigurationStatus.VerificationFailed]: '변경 후 장비 응답을 확인하지 못했습니다.',
-      [ConfigurationStatus.RecoveredOnPreviousConfig]: '변경을 확인하지 못해 이전 통신 설정으로 복구했습니다.',
-      [ConfigurationStatus.DeviceStateUnknown]: '장비의 현재 설정을 확인할 수 없습니다. 다시 Scan하거나 수동으로 확인해 주세요.',
+  function applyConfigurationResult(kind: 'slaveId' | 'baudRate', result: ConfigurationResult): void {
+    if (result.status === ConfigurationStatus.WriteRejected) {
+      operationError.value = '장비가 설정 쓰기 요청을 거부했습니다. 현재 설정값은 변경하지 않습니다.'
+      if (result.failedStepId) operationError.value += ` 실패 단계: ${result.failedStepId}`
+      return
     }
-    operationMessage.value = labels[result.status]
-    if (result.failedStepId) operationMessage.value += ` 실패 단계: ${result.failedStepId}`
-    if (result.currentContext && result.status === ConfigurationStatus.Verified) {
-      onDeviceChanged(Object.freeze({ ...device.value, slaveId: result.currentContext.slaveId, serialConfig: result.currentContext.serialConfig }))
+    if (!result.pendingContext) {
+      operationError.value = '재연결에 사용할 목표 설정을 만들지 못했습니다.'
+      return
     }
+    pendingConfiguration.value = Object.freeze({
+      kind,
+      targetContext: result.pendingContext,
+      delivery: result.status === ConfigurationStatus.ReconnectRequired ? 'acknowledged' : 'uncertain',
+    })
+    operationMessage.value = result.status === ConfigurationStatus.ReconnectRequired
+      ? '설정 명령을 전송하고 연결을 종료했습니다.'
+      : '통신이 끊겨 설정 적용 여부를 확인할 수 없습니다. 연결을 종료했습니다.'
   }
 
-  /** polling을 중단하고 단일 설정 작업을 실행한 뒤 확인된 context에서만 측정을 재개한다. */
+  /** polling을 중단하고 설정을 한 번 쓴 뒤 적용 여부와 관계없이 현재 Serial 연결을 종료한다. */
   async function runConfiguration(kind: 'slaveId' | 'baudRate', target: number): Promise<void> {
     if (!isConnected.value || operationBusy.value) return
     operationBusy.value = true; operationMessage.value = null; operationError.value = null
@@ -106,33 +131,80 @@ export function useTestDeviceRuntime(
       const result = kind === 'slaveId'
         ? await configurator.changeSlaveId(current, target, operationController.signal)
         : await configurator.changeBaudRate(current, target, operationController.signal)
-      applyConfigurationResult(result)
-      if (result.currentContext) runtime.resumeMeasurement({ profileId: current.profileId, slaveId: result.currentContext.slaveId, baudRate: result.currentContext.serialConfig.baudRate, measurementRecipeId: selectedRecipeId.value, requestPort: false })
+      applyConfigurationResult(kind, result)
     } catch (error) {
       operationError.value = error instanceof Error ? error.message : '장비 설정 작업에 실패했습니다.'
-      runtime.resumeMeasurement()
+    } finally {
+      try { await runtime.disconnect() }
+      catch { operationError.value = `${operationError.value ?? '설정 쓰기 후'} Serial 연결을 정상적으로 종료하지 못했습니다.` }
+      operationBusy.value = false; operationController = null
+    }
+  }
+
+  /** 사용자가 장비별 적용 절차를 마친 뒤 새 port를 선택하고 첫 측정 성공 시에만 TestDevice를 확정한다. */
+  async function reconnectPending(): Promise<void> {
+    const pending = pendingConfiguration.value
+    if (!pending || operationBusy.value) return
+    operationBusy.value = true; operationError.value = null
+    operationController = new AbortController()
+    try {
+      await testBusSession.requestPort()
+      await runtime.connectAndVerify({
+        profileId: pending.targetContext.profileId,
+        slaveId: pending.targetContext.slaveId,
+        baudRate: pending.targetContext.serialConfig.baudRate,
+        measurementRecipeId: selectedRecipeId.value,
+        requestPort: false,
+      }, operationController.signal)
+      onDeviceChanged(Object.freeze({
+        ...device.value,
+        slaveId: pending.targetContext.slaveId,
+        serialConfig: pending.targetContext.serialConfig,
+      }))
+      pendingConfiguration.value = null
+      operationMessage.value = '새 설정에서 장비의 첫 측정 응답을 확인했습니다.'
+    } catch (error) {
+      operationError.value = error instanceof Error
+        ? `새 설정에서 장비 응답을 확인하지 못했습니다: ${error.message}`
+        : '새 설정에서 장비 응답을 확인하지 못했습니다.'
+      try { await runtime.disconnect() } catch { /* 원래 검증 오류를 유지한다. */ }
     } finally { operationBusy.value = false; operationController = null }
+  }
+
+  /** 미확정 목표값을 버리되 장비의 실제 상태를 이전 값으로 단정하지 않는다. */
+  function clearPendingConfiguration(): void {
+    pendingConfiguration.value = null
+    operationMessage.value = '미확정 설정을 닫았습니다. 장비 상태가 불분명하면 Scan 또는 수동 설정으로 확인해 주세요.'
   }
 
   async function runAction(recipeId: string, parameters: Readonly<Record<string, unknown>>): Promise<void> {
     if (!isConnected.value || operationBusy.value) return
     operationBusy.value = true; operationMessage.value = null; operationError.value = null
+    setActionState(recipeId, { status: 'running', outputs: Object.freeze([]) })
     operationController = new AbortController(); runtime.pauseMeasurement()
     try {
       const result = await actionRunner.execute(device.value.catalogKey, recipeId, device.value.slaveId, parameters, operationController.signal)
-      const outputText = Object.values(result.outputs).map(({ display }) => `${display.text}${display.unit ? ` ${display.unit}` : ''}`).join(', ')
-      operationMessage.value = outputText ? `작업을 완료했습니다. 결과: ${outputText}` : '작업을 완료하고 장비 응답을 확인했습니다.'
+      const actionOutputs = Object.entries(result.outputs).map(([name, output]) => Object.freeze({
+        name, displayValue: output.display.text, unit: output.display.unit,
+      }))
+      setActionState(recipeId, {
+        status: 'succeeded', outputs: Object.freeze(actionOutputs),
+        message: actionOutputs.length ? undefined : '장비 응답을 확인했습니다.',
+        completedAt: new Date().toLocaleTimeString('ko-KR'),
+      })
     } catch (error) {
       const failedStep = error instanceof RecipeExecutionError && error.stepId ? ` 실패 단계: ${error.stepId}` : ''
+      let message: string
       if (operationController?.signal.aborted || error instanceof RecipeAbortedError || error instanceof OperationAbortedError) {
-        operationError.value = `작업을 취소했습니다.${failedStep}`
+        message = `작업을 취소했습니다.${failedStep}`
       } else if (findErrorCause(error, ModbusExceptionError)) {
-        operationError.value = `장비가 쓰기 요청을 거부했습니다.${failedStep}`
+        message = `장비가 요청을 거부했습니다.${failedStep}`
       } else if (findErrorCause(error, ModbusTimeoutError)) {
-        operationError.value = `장비 응답이 없어 적용 여부를 확인할 수 없습니다. 다시 측정하거나 Scan해 주세요.${failedStep}`
+        message = `장비 응답이 없습니다. 연결과 통신 설정을 확인해 주세요.${failedStep}`
       } else {
-        operationError.value = `작업 실패로 장비 상태를 확인할 수 없습니다.${failedStep}`
+        message = `작업에 실패해 장비 상태를 확인할 수 없습니다.${failedStep}`
       }
+      setActionState(recipeId, { status: 'failed', outputs: Object.freeze([]), message })
     } finally {
       runtime.resumeMeasurement(); operationBusy.value = false; operationController = null
     }
@@ -142,14 +214,17 @@ export function useTestDeviceRuntime(
 
   onMounted(() => { void runtime.initialize().catch(() => undefined) })
   onBeforeUnmount(() => {
+    operationController?.abort('화면 이동')
     unsubscribeFrames(); unsubscribeRuntime(); runtime.dispose()
+    void testBusSession.close()
   })
 
   return {
     connect, connectionLabel: computed(() => CONNECTION_LABELS[snapshot.value.connectionState]), disconnect,
     errorMessage: computed(() => snapshot.value.error?.message ?? null), isConnected, isSupported: serialTransport.isSupported,
-    actionRecipes, cancelOperation, isTransitioning, lastRx, lastTx, lastUpdatedAt, measurementOptions,
-    operationBusy, operationError, operationMessage, outputs, runAction, runConfiguration,
+    actionRecipes, actionStates, cancelOperation, isTransitioning, lastRx, lastTx, lastUpdatedAt, measurementOptions,
+    operationBusy, operationError, operationMessage, outputs, pendingConfiguration, reconnectPending,
+    clearPendingConfiguration, runAction, runConfiguration,
     selectMeasurement, selectedRecipeId,
   }
 }

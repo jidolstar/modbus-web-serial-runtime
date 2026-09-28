@@ -25,7 +25,7 @@ device-catalog/
 - 제조사와 모델
 - 기본 Serial 설정과 지원 baudrate
 - Slave ID 기본값과 범위
-- 측정과 설정 변경 Recipe ID
+- 측정, 설정 변경과 선택적 action Recipe ID
 - Baudrate register code처럼 장비별로 다른 named map
 
 register 주소, scale 또는 장비별 delay를 TypeScript 상수나 `.env`로 옮기지 않는다. 각각 사용하는 Recipe에 기록한다.
@@ -60,7 +60,7 @@ register 주소, scale 또는 장비별 delay를 TypeScript 상수나 `.env`로 
 | Step | 목적 |
 |---|---|
 | `readHoldingRegisters` | FC03 register 읽기 |
-| `writeSingleRegister` | FC06 register 쓰기 |
+| `writeSingleRegister` | FC06 register 쓰기. signed 입력은 선택적 `encode: { "type": "int16" }`로 2의 보수 변환 |
 | `delay` | 설정 적용 대기 |
 | `reopenSerial` | 변경된 baudrate로 port 다시 열기 |
 | `assertEquals` | 읽은 값 검증 |
@@ -73,6 +73,23 @@ register 주소, scale 또는 장비별 delay를 TypeScript 상수나 `.env`로 
 
 - Slave ID 변경: `currentId`, `targetId`
 - Baudrate 변경: `deviceId`, `targetBaud`
+
+Slave ID와 baudrate 변경 Recipe는 장비에 설정값을 기록하는 단계까지만 정의한다. 변경 뒤에는 현재 Serial 연결을 종료하고 새 설정으로 다시 연결하며, 응답이 없으면 장비 전원을 완전히 차단했다가 다시 공급하도록 안내한다. 따라서 표준 설정 변경 Recipe에는 `reopenSerial`, 적용 확인용 `readHoldingRegisters`, `assertEquals`를 넣지 않는다. 설정 잠금 해제, 여러 register 쓰기, 저장 명령과 제조사 문서상 필수인 쓰기 사이 `delay`는 사용할 수 있다.
+
+쓰기 응답만으로 장비에 새 설정이 적용되었다고 단정하지 않는다. 장비에 따라 즉시 적용되거나 재연결 또는 전원 재인가가 필요할 수 있으며, Test Device는 새 Slave ID와 baudrate에서 첫 측정 응답을 받은 뒤에만 화면의 현재 설정을 갱신한다.
+
+## 장비 연결 action
+
+`profile.recipes.actions`는 장비 연결 화면에서 사용자가 한 번씩 실행할 기존 Recipe ID 목록이다. 새 Recipe 종류나 action 전용 설정 객체를 만들지 않는다.
+
+- 진단 조회는 `measurement` Recipe로 정의하고 `readHoldingRegisters`, 최소 1개 output을 포함하며 쓰기 Step을 넣지 않는다.
+- 설정 작업은 `configuration` Recipe로 정의하고 최소 1개 `writeSingleRegister`를 포함한다.
+- 설정값은 주소, 자료형, 배율, 단위, 허용 범위와 적용 조건이 문서로 확인되어 안전한 읽기·쓰기를 함께 제공할 수 있을 때만 공개한다.
+- 전극 전압처럼 본질적으로 조회만 하는 진단값은 읽기 전용 action으로 공개할 수 있다.
+- action에는 `reopenSerial`을 넣지 않는다. Slave ID와 baudrate 변경은 전용 참조와 재연결 workflow를 사용한다.
+- 공장 초기화, 제조사 전용 교정, 불명확한 보정값과 숨은 register 추측은 action으로 등록하지 않는다.
+
+action이 없는 장비는 `actions`를 생략한다. 유효한 action을 등록하면 Test Device가 Recipe parameter와 output을 이용해 입력, 실행과 결과 UI를 자동으로 만든다.
 
 Step ID는 Recipe 안에서만 고유하면 되며 특정 문자열로 고정하지 않는다. 설정 서비스는 실패한 Step의 ID가 아니라 Step type으로 write 실패 여부를 판정한다.
 

@@ -16,6 +16,7 @@ export interface SensorMonitorObserver {
 /** Runtime이 구체적인 timer 구현과 분리되어 사용하는 polling 제어 계약이다. */
 export interface SensorMonitorControl {
   start(request: SensorMonitorRequest, observer: SensorMonitorObserver): void
+  measureOnce(request: SensorMonitorRequest, signal?: AbortSignal): Promise<RecipeExecutionResult>
   stop(): void
 }
 
@@ -65,6 +66,11 @@ export class SensorMonitor implements SensorMonitorControl {
     }
     this.#activeSession = session
     void this.#pollOnce(session, request, observer)
+  }
+
+  /** 수동 재연결 검증에서 polling을 시작하기 전에 목표 설정으로 한 번만 측정한다. */
+  public measureOnce(request: SensorMonitorRequest, signal?: AbortSignal): Promise<RecipeExecutionResult> {
+    return this.recipeRunner.execute(request.profileId, request.recipeId, request.parameters, signal)
   }
 
   /** timer를 해제하고 진행 중 Recipe에 취소 신호를 보내 후속 측정을 막는다. */

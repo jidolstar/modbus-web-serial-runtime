@@ -109,6 +109,35 @@ export class DynamicDeviceRuntime {
     }
   }
 
+  /**
+   * Test Device의 수동 재연결에서 목표 설정으로 port를 열고 첫 측정 응답까지 확인한다.
+   * 첫 측정이 실패하면 현재값을 확정하지 않도록 오류를 호출자에게 반환하며 polling도 시작하지 않는다.
+   */
+  public async connectAndVerify(request: DeviceConnectionRequest, signal?: AbortSignal): Promise<void> {
+    await this.initialize()
+    const profile = this.catalog.getProfile(request.profileId)
+    this.#validateConnectionRequest(profile, request)
+    const measurementRecipeId = request.measurementRecipeId ?? profile.recipes.measurements?.[0]
+    if (!measurementRecipeId) throw new Error(`측정 Recipe가 없는 Profile입니다: ${profile.id}`)
+    this.#validateMeasurementRecipe(profile, measurementRecipeId)
+
+    this.sensorMonitor.stop()
+    this.#updateSnapshot({ activeDevice: request, activeMeasurementRecipeId: measurementRecipeId, outputs: Object.freeze({}), lastUpdatedAt: null, error: null })
+    try {
+      if (request.requestPort !== false) await this.serialTransport.requestPort()
+      await this.serialTransport.open(Object.freeze({ ...profile.serial.default, baudRate: request.baudRate }))
+      const monitorRequest = this.#measurementRequest(profile.id, measurementRecipeId, request.slaveId)
+      const result = await this.sensorMonitor.measureOnce(monitorRequest, signal)
+      this.#handleMeasurement(result.outputs)
+      this.#startMeasurement(profile.id, measurementRecipeId, request.slaveId)
+    } catch (error) {
+      const normalizedError = this.#toError(error)
+      this.sensorMonitor.stop()
+      this.#updateSnapshot({ error: normalizedError })
+      throw normalizedError
+    }
+  }
+
   /** Test Device 화면에서 측정 종류를 바꿀 때 port를 유지하고 polling session만 교체한다. */
   public selectMeasurement(measurementRecipeId: string): void {
     const activeDevice = this.#snapshot.activeDevice
@@ -186,12 +215,17 @@ export class DynamicDeviceRuntime {
   /** 연결과 Recipe 전환이 공유하는 SensorMonitor 요청을 한 곳에서 조립한다. */
   #startMeasurement(profileId: string, recipeId: string, slaveId: number): void {
     this.sensorMonitor.start(
-      { profileId, recipeId, parameters: Object.freeze({ [STANDARD_DEVICE_ID_PARAMETER]: slaveId }) },
+      this.#measurementRequest(profileId, recipeId, slaveId),
       {
         onMeasurement: (result) => this.#handleMeasurement(result.outputs),
         onError: (error) => this.#handleMeasurementError(error),
       },
     )
+  }
+
+  /** polling과 수동 재연결 검증이 동일한 표준 deviceId parameter를 사용하게 한다. */
+  #measurementRequest(profileId: string, recipeId: string, slaveId: number) {
+    return { profileId, recipeId, parameters: Object.freeze({ [STANDARD_DEVICE_ID_PARAMETER]: slaveId }) }
   }
 
   /** 연결 상태를 반영하고 connected 이외 상태에서는 현재 polling session을 폐기한다. */

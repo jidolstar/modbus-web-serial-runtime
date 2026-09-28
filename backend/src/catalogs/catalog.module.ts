@@ -15,5 +15,6 @@ import { CatalogRuntimeController } from './catalog-runtime.controller'
   imports: [AuthModule],
   controllers: [CatalogController, CatalogAssetController, CatalogRuntimeController],
   providers: [CatalogValidationService, CatalogRepository, CatalogService, CatalogAssetRepository, CatalogAssetService, CatalogStorageService],
+  exports: [CatalogRepository, CatalogValidationService],
 })
 export class CatalogModule {}

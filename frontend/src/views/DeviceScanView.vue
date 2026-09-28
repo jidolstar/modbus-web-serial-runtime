@@ -53,8 +53,7 @@ function openTestDevice(device: TestDevice): void {
 
 <template>
   <header class="page-heading">
-    <div><p class="eyebrow">DEVICE DISCOVERY</p><h1>장비 스캔</h1><p class="description help-label">표준 8N1 <HelpTooltip label="8N1" :text="HELP_TOOLTIP_COPY.serial8N1" /> 조합에서 응답하는 Modbus 장비의 Baudrate와 Slave ID를 찾습니다.</p></div>
-    <span class="page-date">원시 통신 데이터는 서버로 전송하지 않습니다.</span>
+    <div><p class="eyebrow">DEVICE DISCOVERY</p><h1>장비 스캔</h1></div>
   </header>
 
   <p v-if="!isSupported" class="notice error">Web Serial API를 지원하는 데스크톱 Chrome 또는 Edge에서 HTTPS로 접속해 주세요.</p>
@@ -62,7 +61,7 @@ function openTestDevice(device: TestDevice): void {
   <p v-if="catalogLoadError" class="notice error">{{ catalogLoadError }}</p>
 
   <section class="surface-card scan-config-panel">
-    <div class="section-heading"><div><h2 class="help-label">스캔 범위 <HelpTooltip label="스캔 범위" :text="HELP_TOOLTIP_COPY.scanRange" /></h2><p>범위를 좁힐수록 장비 탐색이 빠르게 끝납니다.</p></div></div>
+    <div class="section-heading"><div><h2 class="help-label">스캔 범위 <HelpTooltip label="스캔 범위" :text="HELP_TOOLTIP_COPY.scanRange" /></h2></div></div>
     <fieldset class="scan-baud-options" :disabled="scanning">
       <legend><span class="help-label">Baudrate <HelpTooltip label="Baudrate" :text="HELP_TOOLTIP_COPY.baudRate" /></span></legend>
       <label v-for="baudRate in availableBaudRates" :key="baudRate"><input v-model="selectedBaudRates" type="checkbox" :value="baudRate">{{ baudRate.toLocaleString() }}</label>
@@ -85,7 +84,7 @@ function openTestDevice(device: TestDevice): void {
   </section>
 
   <section class="surface-card scan-results-panel">
-    <div class="section-heading"><div><h2 class="help-label">스캔 결과 <HelpTooltip label="스캔 결과" :text="HELP_TOOLTIP_COPY.scanResults" /></h2><p>응답한 통신 조합만 표시하며 장비 모델을 자동으로 추정하지 않습니다.</p></div><span>{{ results.length }}건</span></div>
+    <div class="section-heading"><div><h2 class="help-label">스캔 결과 <HelpTooltip label="스캔 결과" :text="HELP_TOOLTIP_COPY.scanResults" /></h2></div><span>{{ results.length }}건</span></div>
     <div v-if="results.length" class="scan-result-list">
       <article v-for="result in results" :key="`${result.serialConfig.baudRate}:${result.serialConfig.dataBits}:${result.serialConfig.parity}:${result.serialConfig.stopBits}:${result.serialConfig.flowControl}:${result.slaveId}`" class="scan-result-row">
         <div class="scan-result-address"><strong>ID {{ result.slaveId }}</strong><span>{{ result.serialConfig.baudRate.toLocaleString() }} baud · {{ result.serialConfig.dataBits }}{{ result.serialConfig.parity.charAt(0).toUpperCase() }}{{ result.serialConfig.stopBits }}</span></div>
@@ -93,7 +92,7 @@ function openTestDevice(device: TestDevice): void {
         <div class="scan-result-copy">
           <span>Modbus 응답을 확인했습니다. 사용할 Catalog는 사용자가 직접 지정합니다.</span>
         </div>
-        <div class="inline-actions"><button class="button button-primary button-small" type="button" @click="createTestDeviceFromScan(result)">테스트 장비 만들기</button><button class="button button-ghost button-small" type="button" @click="registerUnknown(result)">새 Catalog 등록</button></div>
+        <div class="inline-actions"><button class="button button-primary button-small" type="button" @click="createTestDeviceFromScan(result)">장비 연결하기</button><button class="button button-ghost button-small" type="button" @click="registerUnknown(result)">새 Catalog 등록</button></div>
       </article>
     </div>
     <p v-else class="empty-copy">아직 스캔 결과가 없습니다.</p>

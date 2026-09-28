@@ -107,7 +107,7 @@ async function submit(): Promise<void> {
   <dialog ref="dialog" class="test-device-dialog" aria-labelledby="test-device-dialog-title" @cancel="handleCancel" @click="handleBackdrop">
     <form class="test-device-modal" method="dialog" @submit.prevent="submit">
       <header>
-        <div><p class="eyebrow">TEST DEVICE</p><h2 id="test-device-dialog-title">{{ isEditing ? '테스트 장비 수정' : '테스트 장비 만들기' }}</h2><p>Catalog의 허용 범위에서 실제 테스트에 사용할 통신값을 정합니다.</p></div>
+        <div><p class="eyebrow">DEVICE CONNECTION</p><h2 id="test-device-dialog-title">{{ isEditing ? '카탈로그 수정' : '장비 연결하기' }}</h2><p>Catalog의 허용 범위에서 연결에 사용할 통신값을 정합니다.</p></div>
         <button class="dialog-close" type="button" aria-label="닫기" @click="requestClose">×</button>
       </header>
       <p v-if="errorMessage" class="notice error">{{ errorMessage }}</p>
@@ -119,7 +119,7 @@ async function submit(): Promise<void> {
         <label>Slave ID<input v-model.number="slaveId" type="number" inputmode="numeric" :min="selectedCatalog?.definition.profile.slave.minId" :max="selectedCatalog?.definition.profile.slave.maxId" :disabled="connectionActive"></label>
       </div>
       <p v-if="connectionActive" class="notice warning">연결 중에는 이름만 수정할 수 있습니다. 통신값은 연결을 해제한 뒤 변경해 주세요.</p>
-      <footer><button class="button button-ghost" type="button" :disabled="submitting" @click="requestClose">취소</button><button class="button button-primary" type="submit" :disabled="submitting">{{ submitting ? '포트 선택 중…' : (isEditing ? '변경 적용' : '테스트 시작') }}</button></footer>
+      <footer><button class="button button-ghost" type="button" :disabled="submitting" @click="requestClose">취소</button><button class="button button-primary" type="submit" :disabled="submitting">{{ submitting ? '포트 선택 중…' : (isEditing ? '변경 적용' : '연결하기') }}</button></footer>
     </form>
   </dialog>
 </template>

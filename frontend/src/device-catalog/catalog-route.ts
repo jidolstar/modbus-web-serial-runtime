@@ -9,11 +9,19 @@ export type AppRoute =
   | { readonly page: 'catalog-edit-files'; readonly catalogKey: string }
   | { readonly page: 'catalog-edit-links'; readonly catalogKey: string }
   | { readonly page: 'test-device'; readonly name: string; readonly catalogKey: string; readonly catalogRevision: number; readonly baudRate: number; readonly slaveId: number; readonly origin: 'catalog' | 'scan' }
+  | { readonly page: 'test-group-list' }
+  | { readonly page: 'test-group-add' }
+  | { readonly page: 'test-group-edit'; readonly groupId: number }
+  | { readonly page: 'test-group-run'; readonly groupId: number }
 
 const CATALOG_KEY_PATTERN = /^[a-z0-9][a-z0-9._-]{0,99}$/ // API URL에 허용되는 Catalog key. 예: "cwt-th04s"
 
 /** App shell이 새로고침·뒤로가기를 같은 화면 상태로 복원할 때 현재 URL을 제한된 route로 해석한다. */
 export function parseAppRoute(location: Pick<Location, 'pathname' | 'search'> = window.location): AppRoute {
+  if (location.pathname === '/test-groups') return { page: 'test-group-list' }
+  if (location.pathname === '/test-groups/add') return { page: 'test-group-add' }
+  const groupRoute = /^\/test-groups\/(\d+)\/(edit|run)$/.exec(location.pathname)
+  if (groupRoute) { const groupId = Number(groupRoute[1]); if (Number.isSafeInteger(groupId) && groupId > 0) return { page: groupRoute[2] === 'edit' ? 'test-group-edit' : 'test-group-run', groupId } }
   if (location.pathname === '/scan') return { page: 'scan' }
   if (location.pathname === '/test-device') {
     const parameters = new URLSearchParams(location.search)
@@ -69,6 +77,10 @@ export function parseAppRoute(location: Pick<Location, 'pathname' | 'search'> = 
 export function routeUrl(route: AppRoute): string {
   if (route.page === 'dashboard') return '/'
   if (route.page === 'scan') return '/scan'
+  if (route.page === 'test-group-list') return '/test-groups'
+  if (route.page === 'test-group-add') return '/test-groups/add'
+  if (route.page === 'test-group-edit') return `/test-groups/${route.groupId}/edit`
+  if (route.page === 'test-group-run') return `/test-groups/${route.groupId}/run`
   if (route.page === 'catalog-list') return route.search?.trim() ? `/catalogs?search=${encodeURIComponent(route.search.trim())}` : '/catalogs'
   if (route.page === 'catalog-add') {
     if (route.observedBaudRate && route.observedSlaveId) return `/catalogs/add?baudRate=${route.observedBaudRate}&slaveId=${route.observedSlaveId}`

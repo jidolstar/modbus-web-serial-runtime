@@ -1,5 +1,5 @@
 import { ColumnType, Generated } from 'kysely'
-import type { CatalogBundle } from '@modbus-manager/device-catalog-domain'
+import type { CatalogBundle, SerialFlowControl, SerialParity } from '@modbus-manager/device-catalog-domain'
 
 export interface UsersTable {
   id: Generated<number>
@@ -86,6 +86,34 @@ export interface CatalogLinksTable {
   updated_at: Generated<Date>
 }
 
+/** 사용자가 저장한 한 RS485 버스의 공통 통신 설정이다. */
+export interface TestGroupsTable {
+  id: Generated<number>
+  owner_user_id: number // 세션 사용자 소유권 FK. client 입력으로 받지 않는다.
+  name: string // 화면 표시 이름. 예: "시험실 A 그룹"
+  revision: Generated<number> // 낙관적 잠금 번호. 예: 2
+  baud_rate: number
+  data_bits: 7 | 8
+  stop_bits: 1 | 2
+  parity: SerialParity
+  flow_control: SerialFlowControl
+  created_at: Generated<Date>
+  updated_at: Generated<Date>
+}
+
+/** Test Group 안에서 순서대로 측정할 Catalog 기반 node다. */
+export interface TestGroupNodesTable {
+  id: Generated<number>
+  test_group_id: number
+  name: string // node 표시 이름. 예: "온도 센서 1"
+  catalog_id: number
+  catalog_revision: number
+  slave_id: number
+  position: number // 0부터 시작하는 실행 순서
+  created_at: Generated<Date>
+  updated_at: Generated<Date>
+}
+
 export interface DatabaseSchema {
   users: UsersTable
   auth_sessions: AuthSessionsTable
@@ -93,4 +121,6 @@ export interface DatabaseSchema {
   catalog_thumbnails: CatalogThumbnailsTable
   catalog_files: CatalogFilesTable
   catalog_links: CatalogLinksTable
+  test_groups: TestGroupsTable
+  test_group_nodes: TestGroupNodesTable
 }

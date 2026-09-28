@@ -55,7 +55,7 @@ describe('Device maintenance CWT integration', () => {
     await transport.open(CURRENT_SERIAL_CONFIG)
     const modbusClient = new ModbusRtuClient(transport, 100)
     const recipeExecutor = new RecipeExecutor(catalog, modbusClient, transport)
-    const services = createDeviceMaintenanceServices(catalog, recipeExecutor, transport)
+    const services = createDeviceMaintenanceServices(catalog, recipeExecutor)
     let activeSlaveId = 100
 
     transport.setWriteHandler((requestFrame) => {
@@ -86,8 +86,8 @@ describe('Device maintenance CWT integration', () => {
     })
     const configurationResult = await services.configurator.changeSlaveId(currentContext, 101)
 
-    expect(configurationResult.status).toBe(ConfigurationStatus.Verified)
-    expect(configurationResult.currentContext?.slaveId).toBe(101)
+    expect(configurationResult.status).toBe(ConfigurationStatus.ReconnectRequired)
+    expect(configurationResult.pendingContext?.slaveId).toBe(101)
     expect(activeSlaveId).toBe(101)
     expect(transport.writtenFrames.some((frame) => (
       frame[1] === ModbusFunctionCode.WriteSingleRegister
@@ -95,11 +95,11 @@ describe('Device maintenance CWT integration', () => {
       && frame[3] === 0xd0
     ))).toBe(true)
 
-    const changedIdContext = configurationResult.currentContext
+    const changedIdContext = configurationResult.pendingContext
     if (!changedIdContext) throw new Error('Slave ID 변경 후 context가 필요합니다.')
     const baudResult = await services.configurator.changeBaudRate(changedIdContext, 4_800)
-    expect(baudResult.status).toBe(ConfigurationStatus.Verified)
-    expect(baudResult.currentContext?.serialConfig.baudRate).toBe(4_800)
+    expect(baudResult.status).toBe(ConfigurationStatus.ReconnectRequired)
+    expect(baudResult.pendingContext?.serialConfig.baudRate).toBe(4_800)
     expect(transport.writtenFrames.some((frame) => (
       frame[1] === ModbusFunctionCode.WriteSingleRegister
       && frame[2] === 0x07

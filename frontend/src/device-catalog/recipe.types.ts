@@ -2,6 +2,7 @@ export {
   RecipeDecoderType,
   RecipeFormatterType,
   RecipeRegisterByteOrder,
+  RecipeRegisterEncodingType,
   RecipeRegisterOrder,
   RecipeStringTrim,
   RecipeApplyMode,

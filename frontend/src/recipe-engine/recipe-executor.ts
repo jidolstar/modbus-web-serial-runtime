@@ -1,6 +1,7 @@
 import type { DeviceCatalog } from '../device-catalog/catalog.types'
 import type { DeviceProfile } from '../device-catalog/device-profile.types'
 import {
+  RecipeRegisterEncodingType,
   RecipeStepType,
   type Recipe,
   type RecipeParameter,
@@ -22,6 +23,10 @@ import {
   type RecipeStepResult,
 } from './recipe-execution.types'
 import { RecipeValueResolver } from './recipe-value-resolver'
+
+const MINIMUM_SIGNED_16 = -32768
+const MAXIMUM_SIGNED_16 = 32767
+const UNSIGNED_16_MODULUS = 0x10000
 
 /** Step handler가 공유하는 한 번의 Recipe 실행 상태다. */
 interface RecipeExecutionContext {
@@ -180,8 +185,30 @@ export class RecipeExecutor implements RecipeRunner {
   async #writeSingleRegister(step: RecipeStep, context: RecipeExecutionContext): Promise<void> {
     if (step.type !== RecipeStepType.WriteSingleRegister) return this.#wrongHandler(step, context.recipe.id)
     const slaveId = this.#valueResolver.resolveNumber(step.slaveId, context.values, context.profile, context.recipe.id)
-    const value = this.#valueResolver.resolveNumber(step.value, context.values, context.profile, context.recipe.id)
-    await this.modbusClient.writeSingleRegister(slaveId, step.address, value)
+    const resolvedValue = this.#valueResolver.resolveNumber(step.value, context.values, context.profile, context.recipe.id)
+    await this.modbusClient.writeSingleRegister(
+      slaveId,
+      step.address,
+      this.#encodeRegisterValue(resolvedValue, step.encode?.type, context.recipe.id, step.id),
+    )
+  }
+
+  /** FC06은 unsigned wire 값만 받으므로 명시된 int16 입력만 2의 보수로 변환한다. */
+  #encodeRegisterValue(
+    value: number,
+    encoding: RecipeRegisterEncodingType | undefined,
+    recipeId: string,
+    stepId: string,
+  ): number {
+    if (encoding !== RecipeRegisterEncodingType.Signed16) return value
+    if (!Number.isInteger(value) || value < MINIMUM_SIGNED_16 || value > MAXIMUM_SIGNED_16) {
+      throw new RecipeExecutionError(
+        `int16 register 값은 ${MINIMUM_SIGNED_16}~${MAXIMUM_SIGNED_16} 정수여야 합니다.`,
+        recipeId,
+        stepId,
+      )
+    }
+    return value < 0 ? value + UNSIGNED_16_MODULUS : value
   }
 
   async #delay(step: RecipeStep, context: RecipeExecutionContext): Promise<void> {

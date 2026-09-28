@@ -6,11 +6,14 @@ export enum CatalogBundleSchemaVersion { Version1 = '1.0' }
 export enum SerialParity { None = 'none', Even = 'even', Odd = 'odd' }
 export enum SerialFlowControl { None = 'none', Hardware = 'hardware' }
 export enum RecipeKind { Measurement = 'measurement', Configuration = 'configuration' }
+/** @deprecated 표준 설정 변경은 적용 방식과 무관하게 사용자 전원 재인가와 수동 재연결로 확인한다. */
 export enum RecipeApplyMode { Immediate = 'immediate', AfterPowerCycle = 'after-power-cycle' }
 export enum RecipeStepType {
   ReadHoldingRegisters = 'readHoldingRegisters', WriteSingleRegister = 'writeSingleRegister',
   Delay = 'delay', ReopenSerial = 'reopenSerial', AssertEquals = 'assertEquals',
 }
+/** 사람이 입력한 signed 값을 Modbus register의 unsigned 16-bit wire 값으로 바꾸는 제한된 인코딩 목록이다. */
+export enum RecipeRegisterEncodingType { Signed16 = 'int16' }
 /** Modbus register 배열을 의미 값으로 해석하는, 실행 엔진이 보장하는 기본 decoder 목록이다. */
 export enum RecipeDecoderType {
   Unsigned16 = 'uint16', Signed16 = 'int16', Unsigned32 = 'uint32', Signed32 = 'int32',
@@ -36,7 +39,7 @@ export interface DeviceRecipeReferences {
   readonly measurements?: ReadonlyArray<string>
   readonly changeSlaveId?: string
   readonly changeBaudRate?: string
-  /** 관리자가 테스트 화면에 직접 노출하도록 허용한 설정 Recipe ID 목록이다. */
+  /** 관리자가 장비 연결 화면에 일회성 조회·설정 작업으로 공개한 Recipe ID 목록이다. */
   readonly actions?: ReadonlyArray<string>
 }
 
@@ -71,7 +74,13 @@ export interface EnumRecipeParameter extends RecipeParameterBase { readonly type
 export type RecipeParameter = IntegerRecipeParameter | EnumRecipeParameter
 interface RecipeStepBase { readonly id: string; readonly type: RecipeStepType }
 export interface ReadHoldingRegistersStep extends RecipeStepBase { readonly type: RecipeStepType.ReadHoldingRegisters; readonly slaveId: RecipeValue; readonly address: number; readonly count: number; readonly saveAs: string }
-export interface WriteSingleRegisterStep extends RecipeStepBase { readonly type: RecipeStepType.WriteSingleRegister; readonly slaveId: RecipeValue; readonly address: number; readonly value: RecipeValue }
+export interface WriteSingleRegisterStep extends RecipeStepBase {
+  readonly type: RecipeStepType.WriteSingleRegister
+  readonly slaveId: RecipeValue
+  readonly address: number
+  readonly value: RecipeValue
+  readonly encode?: { readonly type: RecipeRegisterEncodingType.Signed16 }
+}
 export interface DelayStep extends RecipeStepBase { readonly type: RecipeStepType.Delay; readonly milliseconds: number }
 export interface ReopenSerialStep extends RecipeStepBase { readonly type: RecipeStepType.ReopenSerial; readonly baudRate: RecipeValue }
 export interface AssertEqualsStep extends RecipeStepBase { readonly type: RecipeStepType.AssertEquals; readonly actual: string; readonly expected: RecipeValue }
@@ -124,6 +133,31 @@ export function validateCatalogBundleReferences(bundle: CatalogBundle): Readonly
     if (!recipesById.has(recipeId)) issues.push({ path: '/profile/recipes', message: `존재하지 않는 Recipe를 참조합니다: ${recipeId}` })
   }
 
+  /** 표준 설정 변경은 쓰기 뒤 연결을 종료하므로 Recipe 안에서 재접속하거나 적용값을 읽지 못하게 한다. */
+  const validateConfigurationChangeRecipe = (referenceName: 'changeSlaveId' | 'changeBaudRate'): void => {
+    const recipeId = bundle.profile.recipes[referenceName]
+    if (!recipeId) return
+    const recipeIndex = bundle.recipes.findIndex(({ id }) => id === recipeId)
+    const recipe = recipesById.get(recipeId)
+    if (!recipe) return
+    if (recipe.kind !== RecipeKind.Configuration) {
+      issues.push({ path: `/profile/recipes/${referenceName}`, message: `표준 설정 변경은 configuration Recipe여야 합니다: ${recipeId}` })
+    }
+    if (!recipe.steps.some(({ type }) => type === RecipeStepType.WriteSingleRegister)) {
+      issues.push({ path: `/recipes/${recipeIndex}/steps`, message: `표준 설정 변경에는 writeSingleRegister Step이 필요합니다: ${recipeId}` })
+    }
+    const forbiddenStep = recipe.steps.find(({ type }) => [
+      RecipeStepType.ReadHoldingRegisters,
+      RecipeStepType.ReopenSerial,
+      RecipeStepType.AssertEquals,
+    ].includes(type))
+    if (forbiddenStep) {
+      issues.push({ path: `/recipes/${recipeIndex}/steps`, message: `표준 설정 변경 Recipe는 쓰기 후 연결·검증 Step을 포함할 수 없습니다: ${forbiddenStep.id}` })
+    }
+  }
+  validateConfigurationChangeRecipe('changeSlaveId')
+  validateConfigurationChangeRecipe('changeBaudRate')
+
   for (const [recipeIndex, recipe] of bundle.recipes.entries()) {
     if (recipe.applyMode === RecipeApplyMode.AfterPowerCycle && recipe.kind !== RecipeKind.Configuration) {
       issues.push({ path: `/recipes/${recipeIndex}/applyMode`, message: '전원 재인가 적용 방식은 설정 Recipe에만 사용할 수 있습니다.' })
@@ -163,11 +197,23 @@ export function validateCatalogBundleReferences(bundle: CatalogBundle): Readonly
 
   for (const actionId of bundle.profile.recipes.actions ?? []) {
     const action = recipesById.get(actionId)
-    if (!action || action.kind !== RecipeKind.Configuration) {
-      issues.push({ path: '/profile/recipes/actions', message: `추가 작업은 configuration Recipe만 참조할 수 있습니다: ${actionId}` })
+    if (!action) continue
+    const actionIndex = bundle.recipes.findIndex(({ id }) => id === actionId)
+    if ([bundle.profile.recipes.changeSlaveId, bundle.profile.recipes.changeBaudRate].includes(actionId)) {
+      issues.push({ path: '/profile/recipes/actions', message: `표준 통신 설정 변경 Recipe는 추가 작업으로 중복 공개할 수 없습니다: ${actionId}` })
+    }
+    if (action.steps.some(({ type }) => type === RecipeStepType.ReopenSerial)) {
+      issues.push({ path: `/recipes/${actionIndex}/steps`, message: `추가 작업은 Serial 연결을 다시 열 수 없습니다: ${actionId}` })
+    }
+    const hasRead = action.steps.some(({ type }) => type === RecipeStepType.ReadHoldingRegisters)
+    const hasWrite = action.steps.some(({ type }) => type === RecipeStepType.WriteSingleRegister)
+    if (action.kind === RecipeKind.Measurement) {
+      if (!hasRead || hasWrite || !(action.outputs?.length)) {
+        issues.push({ path: '/profile/recipes/actions', message: `조회 추가 작업은 읽기 Step과 output이 있고 쓰기 Step이 없는 measurement Recipe여야 합니다: ${actionId}` })
+      }
       continue
     }
-    if (!action.steps.some(({ type }) => type === RecipeStepType.WriteSingleRegister)) {
+    if (action.kind === RecipeKind.Configuration && !hasWrite) {
       issues.push({ path: '/profile/recipes/actions', message: `추가 작업에는 writeSingleRegister Step이 필요합니다: ${actionId}` })
     }
   }
