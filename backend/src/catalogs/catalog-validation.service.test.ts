@@ -15,6 +15,37 @@ describe('CatalogValidationService', () => {
     assert.equal(validator.validate(catalogBundle).profile.id, 'cwt-th04s')
   })
 
+  it('explains a changeBaudRate enum that differs from supported baud rates', () => {
+    const invalidBundle = cloneJson(catalogBundle) as unknown as {
+      profile: { serial: { supportedBaudRates: number[] }; recipes: { changeBaudRate: string } }
+      recipes: Array<{ id: string; parameters?: Array<{ name: string; values?: Array<string | number> }> }>
+    }
+    const baudRecipe = invalidBundle.recipes.find(({ id }) => id === invalidBundle.profile.recipes.changeBaudRate)
+    const targetBaud = baudRecipe?.parameters?.find(({ name }) => name === 'targetBaud')
+    assert.ok(targetBaud?.values)
+    targetBaud.values = targetBaud.values.slice(0, -1)
+
+    assert.deepEqual(validator.inspect(invalidBundle), [{
+      path: '/profile/recipes/changeBaudRate',
+      message: `changeBaudRate Recipe의 targetBaud enum은 supportedBaudRates와 순서까지 같아야 합니다: ${invalidBundle.profile.serial.supportedBaudRates.join(', ')}`,
+    }])
+  })
+
+  it('explains enum values that are missing from a write Step map', () => {
+    const invalidBundle = cloneJson(catalogBundle) as unknown as {
+      profile: { maps: Record<string, Record<string, number>>; recipes: { changeBaudRate: string } }
+      recipes: Array<{ id: string }>
+    }
+    delete invalidBundle.profile.maps['baud-rate']['9600']
+    const baudRecipeIndex = invalidBundle.recipes.findIndex(({ id }) => id === invalidBundle.profile.recipes.changeBaudRate)
+
+    assert.ok(validator.inspect(invalidBundle).some((issue) => (
+      issue.path === `/recipes/${baudRecipeIndex}/steps/0/value/map`
+      && issue.message.includes("map 'baud-rate'")
+      && issue.message.includes('9600')
+    )))
+  })
+
   it('rejects a missing Recipe reference with a stable public error', () => {
     const invalidBundle = cloneJson(catalogBundle)
     invalidBundle.recipes = invalidBundle.recipes.filter(({ id }) => id !== invalidBundle.profile.recipes.measurements[0])

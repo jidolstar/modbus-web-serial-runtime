@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "catalog-ai-proposal.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title", "definition", "warnings", "assumptions", "sources"],
+  "properties": {
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "definition": {
+      "$ref": "catalog-bundle.schema.json"
+    },
+    "warnings": {
+      "type": "array",
+      "maxItems": 30,
+      "items": {
+        "type": "string",
+        "maxLength": 1000
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "maxItems": 30,
+      "items": {
+        "type": "string",
+        "maxLength": 1000
+      }
+    },
+    "sources": {
+      "type": "array",
+      "maxItems": 30,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["title", "url"],
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 2048
+          }
+        }
+      }
+    }
+  }
+}

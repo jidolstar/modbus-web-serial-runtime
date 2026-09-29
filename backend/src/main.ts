@@ -30,7 +30,7 @@ async function bootstrap(): Promise<void> {
   })
   await app.register(multipart, {
     // Fastify 기본 1MB 제한보다 앱의 검증 상한을 먼저 적용하고, 서비스에서도 실제 stream byte를 다시 센다.
-    limits: { files: 1, fields: 4, parts: 5, fileSize: Math.max(config.catalogUploads.fileMaxBytes, config.catalogUploads.thumbnailMaxBytes) },
+    limits: { files: 5, fields: 5, parts: 10, fileSize: Math.max(config.catalogUploads.fileMaxBytes, config.catalogUploads.thumbnailMaxBytes) },
   })
   app.useGlobalFilters(new HttpExceptionFilter())
   app.setGlobalPrefix('api')

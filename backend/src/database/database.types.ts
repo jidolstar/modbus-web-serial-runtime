@@ -114,6 +114,35 @@ export interface TestGroupNodesTable {
   updated_at: Generated<Date>
 }
 
+export type CatalogAiWorkflow = 'create' | 'update'
+export type CatalogAiRequestKind = 'generate' | 'review'
+export type CatalogAiRequestStatus = 'pending' | 'completed' | 'failed' | 'cancelled'
+
+/** Gemini 호출 1회당 요청·응답을 감사하기 위한 row다. 첨부 bytes와 인증정보는 저장하지 않는다. */
+export interface CatalogAiRequestsTable {
+  id: Generated<number>
+  job_id: string // Browser에 노출하는 임의 job ID. 예: UUID
+  requester_email: string // 요청 당시 인증 email snapshot. users FK를 두지 않는다.
+  workflow: CatalogAiWorkflow
+  request_kind: CatalogAiRequestKind
+  catalog_key_snapshot: string | null
+  base_revision: number | null
+  model: string
+  prompt_version: string
+  request_payload: ColumnType<unknown | string, string, string>
+  attachments_json: ColumnType<unknown | string, string, string>
+  response_payload: ColumnType<unknown | string | null, string | null, string | null>
+  status: CatalogAiRequestStatus
+  upstream_response_id: string | null
+  error_code: string | null
+  error_detail: string | null
+  input_tokens: number | null
+  output_tokens: number | null
+  requested_at: Generated<Date>
+  completed_at: Date | null
+  duration_ms: number | null
+}
+
 export interface DatabaseSchema {
   users: UsersTable
   auth_sessions: AuthSessionsTable
@@ -123,4 +152,5 @@ export interface DatabaseSchema {
   catalog_links: CatalogLinksTable
   test_groups: TestGroupsTable
   test_group_nodes: TestGroupNodesTable
+  catalog_ai_requests: CatalogAiRequestsTable
 }

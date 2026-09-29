@@ -5,6 +5,7 @@ const MIN_JWT_SECRET_BYTES = 32
 const DEFAULT_CATALOG_FILE_MAX_BYTES = 20 * 1024 * 1024
 const DEFAULT_CATALOG_THUMBNAIL_MAX_BYTES = 10 * 1024 * 1024
 const DEFAULT_CATALOG_UPLOAD_ROOT = '/var/lib/modbus-manager/catalog-uploads'
+const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash-lite'
 
 export const GOOGLE_CONFIGURATION_KEYS = [
   'GOOGLE_OIDC_CLIENT_ID',
@@ -48,6 +49,13 @@ export interface AppConfig {
     readonly rootPath: string // Backend 전용 volume의 절대 경로. 예: "/var/lib/modbus-manager/catalog-uploads"
     readonly fileMaxBytes: number // 일반 참고 파일의 최대 크기. 예: 20971520
     readonly thumbnailMaxBytes: number // 썸네일 원본의 최대 크기. 예: 10485760
+  }
+  readonly gemini: {
+    readonly configured: boolean // API key가 설정되어 AI Catalog 기능을 호출할 수 있는지 여부
+    readonly apiKey?: string // Backend에서만 읽는 project key. 응답·로그·Frontend에 노출하지 않는다.
+    readonly model: string // Catalog JSON 생성에 사용하는 고정 모델 ID. 예: "gemini-3.5-flash-lite"
+    readonly timeoutMs: number // Gemini 응답을 기다리는 최대 시간. 예: 300000
+    readonly auditRetentionDays: number // 요청·응답 감사 row 보관 일수. 예: 90
   }
 }
 
@@ -188,6 +196,13 @@ export function loadAppConfig(env: Environment = process.env): AppConfig {
       rootPath: env.CATALOG_UPLOAD_ROOT?.trim() || DEFAULT_CATALOG_UPLOAD_ROOT,
       fileMaxBytes: parseInteger(env, 'CATALOG_FILE_MAX_BYTES', DEFAULT_CATALOG_FILE_MAX_BYTES, 1_024, 100 * 1024 * 1024),
       thumbnailMaxBytes: parseInteger(env, 'CATALOG_THUMBNAIL_MAX_BYTES', DEFAULT_CATALOG_THUMBNAIL_MAX_BYTES, 1_024, 25 * 1024 * 1024),
+    },
+    gemini: {
+      configured: Boolean(env.GEMINI_API_KEY?.trim()),
+      apiKey: env.GEMINI_API_KEY?.trim() || undefined,
+      model: env.GEMINI_CATALOG_MODEL?.trim() || DEFAULT_GEMINI_MODEL,
+      timeoutMs: parseInteger(env, 'GEMINI_CATALOG_TIMEOUT_MS', 300_000, 30_000, 600_000),
+      auditRetentionDays: parseInteger(env, 'GEMINI_AUDIT_RETENTION_DAYS', 90, 1, 365),
     },
   }
 }

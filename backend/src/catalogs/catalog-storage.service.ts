@@ -107,6 +107,13 @@ export class CatalogStorageService {
     await rename(this.pathFor(trashKey), this.pathFor(storageKey))
   }
 
+  /** AI 승인 보상 처리에서 최종 storage 파일을 원래 세션 절대 경로로 되돌린다. */
+  public async restoreToTemporaryPath(storageKey: string, temporaryPath: string): Promise<void> {
+    const target = resolve(temporaryPath); this.assertInsideRoot(target)
+    await mkdir(resolve(target, '..'), { recursive: true })
+    await rename(this.pathFor(storageKey), target)
+  }
+
   public async remove(storageKeyOrPath: string): Promise<void> {
     const target = isAbsolute(storageKeyOrPath) ? resolve(storageKeyOrPath) : this.pathFor(storageKeyOrPath)
     this.assertInsideRoot(target)

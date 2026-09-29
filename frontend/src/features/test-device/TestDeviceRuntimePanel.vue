@@ -119,7 +119,7 @@ defineExpose({ connect: runtime.connect, disconnect: runtime.disconnect, isConne
     <div v-if="pendingConfirmation" class="operation-confirm" role="region" aria-labelledby="operation-confirm-title">
       <h3 id="operation-confirm-title">장비에 쓰기 전에 확인해 주세요</h3>
       <p><strong>{{ device.name }}</strong> · Slave ID {{ device.slaveId }}에 {{ pendingConfirmation.type === 'slaveId' ? `Slave ID ${targetSlaveId}` : pendingConfirmation.type === 'baudRate' ? `baudrate ${targetBaudRate.toLocaleString()}` : pendingConfirmation.recipe?.name }} 작업을 실행합니다.</p>
-      <p v-if="pendingConfirmation.type !== 'action'">쓰기 시도 후 안전한 확인을 위해 현재 COM 포트 연결을 종료합니다. 설정은 장비에 따라 즉시 적용되거나 재연결 또는 전원 재인가 후 적용될 수 있습니다.</p>
+      <p v-if="pendingConfirmation.type !== 'action'">쓰기 응답을 받으면 현재 COM 포트 연결을 먼저 종료하고, 새 Slave ID와 baudrate로 화면을 다시 연 뒤 자동 연결합니다. 설정 적용에 전원 재인가가 필요한 장비는 자동 연결에 실패할 수 있습니다.</p>
       <div v-if="pendingConfirmation.recipe" class="operation-parameters">
         <label v-for="parameter in pendingConfirmation.recipe.parameters?.filter(({ name }) => name !== STANDARD_DEVICE_ID_PARAMETER)" :key="parameter.name">{{ parameter.label ?? parameter.name }}
           <input v-if="parameter.type === 'integer'" v-model.number="actionValues[pendingConfirmation.recipe.id][parameter.name]" type="number" :min="parameter.minimum" :max="parameter.maximum" :placeholder="`${parameter.minimum}~${parameter.maximum}`" />

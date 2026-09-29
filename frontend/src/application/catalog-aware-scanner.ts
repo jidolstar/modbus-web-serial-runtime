@@ -4,11 +4,10 @@ import { SerialDisconnectedError } from '../serial/serial-errors'
 import type { SerialTransport } from '../serial/serial-transport'
 import { SerialFlowControl, SerialParity, type SerialConfig } from '../serial/serial-types'
 import { findErrorCause, OperationAbortedError, throwIfOperationAborted } from './operation-errors'
+import { STANDARD_MODBUS_BAUD_RATES } from '@modbus-manager/device-catalog-domain'
 
 const SERIAL_REOPEN_SETTLE_MS = 100 // baudrate 변경 후 USB-RS485와 RTU 무통신 구간을 안정화하는 대기시간. 예: 100ms
-export const STANDARD_MODBUS_BAUD_RATES = Object.freeze([
-  1_200, 2_400, 4_800, 9_600, 19_200, 38_400, 57_600, 115_200,
-]) // 현장에서 사용할 가능성이 있는 1차 장비 Scan baudrate 목록. 저속 300·600은 Scan 시간 때문에 제외한다.
+export { STANDARD_MODBUS_BAUD_RATES }
 
 export enum CatalogScanStage {
   Discovery = 'discovery', // 주소 응답만 빠르게 확인하는 1차 단계

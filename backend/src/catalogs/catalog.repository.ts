@@ -15,6 +15,11 @@ export interface CatalogDefinitionValues {
   readonly model: string // Profile 모델. 예: "CWT-TH04S"
   readonly definition: CatalogBundle // 검증 완료된 전체 Bundle
 }
+export interface CatalogAiExampleRow {
+  readonly catalog_key: string
+  readonly title: string
+  readonly definition_json: CatalogBundle | string
+}
 
 /**
  * CatalogService의 영속화 요청을 Kysely parameter query로 실행한다.
@@ -80,6 +85,16 @@ export class CatalogRepository {
     return this.database.selectFrom('catalog').selectAll().where('enabled', '=', true).orderBy('catalog_key', 'asc').execute()
   }
 
+  /** AI 생성 prompt가 참고할 활성 Catalog 후보를 key 순서로 제한해 읽는다. 첨부파일과 사용자 정보는 포함하지 않는다. */
+  public listEnabledAiExamples(limit: number): Promise<CatalogAiExampleRow[]> {
+    return this.database.selectFrom('catalog')
+      .select(['catalog_key', 'title', 'definition_json'])
+      .where('enabled', '=', true)
+      .orderBy('catalog_key', 'asc')
+      .limit(limit)
+      .execute()
+  }
+
   private findById(id: number): Promise<CatalogRow | undefined> {
     return this.database.selectFrom('catalog').selectAll().where('id', '=', id).executeTakeFirst()
   }
@@ -107,5 +122,10 @@ export class CatalogRepository {
       updated_by_user_id: userId,
     }).where('catalog_key', '=', catalogKey).where('revision', '=', revision).executeTakeFirst()
     return result.numUpdatedRows === 1n
+  }
+
+  /** AI 승인 보상 처리에서 방금 만든 Catalog만 제거한다. 일반 관리 삭제 기능으로 노출하지 않는다. */
+  public async deleteByKey(catalogKey: string): Promise<void> {
+    await this.database.deleteFrom('catalog').where('catalog_key', '=', catalogKey).executeTakeFirst()
   }
 }

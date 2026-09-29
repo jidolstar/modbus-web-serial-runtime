@@ -101,7 +101,8 @@ export function useTestDeviceRuntime(
     try { runtime.selectMeasurement(selectedRecipeId.value) } catch { /* Runtime allowlist 검증 실패 시 기존 연결을 유지한다. */ }
   }
 
-  function applyConfigurationResult(kind: 'slaveId' | 'baudRate', result: ConfigurationResult): void {
+  /** 응답이 불확실하거나 거부된 쓰기는 자동 반영하지 않고 사용자가 확인할 상태로 남긴다. */
+  function applyUnconfirmedConfigurationResult(kind: 'slaveId' | 'baudRate', result: ConfigurationResult): void {
     if (result.status === ConfigurationStatus.WriteRejected) {
       operationError.value = '장비가 설정 쓰기 요청을 거부했습니다. 현재 설정값은 변경하지 않습니다.'
       if (result.failedStepId) operationError.value += ` 실패 단계: ${result.failedStepId}`
@@ -116,29 +117,45 @@ export function useTestDeviceRuntime(
       targetContext: result.pendingContext,
       delivery: result.status === ConfigurationStatus.ReconnectRequired ? 'acknowledged' : 'uncertain',
     })
-    operationMessage.value = result.status === ConfigurationStatus.ReconnectRequired
-      ? '설정 명령을 전송하고 연결을 종료했습니다.'
-      : '통신이 끊겨 설정 적용 여부를 확인할 수 없습니다. 연결을 종료했습니다.'
+    operationMessage.value = '통신이 끊겨 설정 적용 여부를 확인할 수 없습니다. 연결을 종료했습니다.'
   }
 
-  /** polling을 중단하고 설정을 한 번 쓴 뒤 적용 여부와 관계없이 현재 Serial 연결을 종료한다. */
+  /** polling을 중단하고 설정을 한 번 쓴 뒤 기존 port를 닫은 다음 확인된 목표값으로 화면을 다시 연다. */
   async function runConfiguration(kind: 'slaveId' | 'baudRate', target: number): Promise<void> {
     if (!isConnected.value || operationBusy.value) return
     operationBusy.value = true; operationMessage.value = null; operationError.value = null
     operationController = new AbortController(); runtime.pauseMeasurement()
     const current = { profileId: device.value.catalogKey, slaveId: device.value.slaveId, serialConfig: device.value.serialConfig }
+    let confirmedTarget: DeviceContext | null = null
+    let disconnected = false
     try {
       const result = kind === 'slaveId'
         ? await configurator.changeSlaveId(current, target, operationController.signal)
         : await configurator.changeBaudRate(current, target, operationController.signal)
-      applyConfigurationResult(kind, result)
+      if (result.status === ConfigurationStatus.ReconnectRequired && result.pendingContext) {
+        confirmedTarget = result.pendingContext
+      } else {
+        applyUnconfirmedConfigurationResult(kind, result)
+      }
     } catch (error) {
       operationError.value = error instanceof Error ? error.message : '장비 설정 작업에 실패했습니다.'
     } finally {
-      try { await runtime.disconnect() }
+      try { await runtime.disconnect(); disconnected = true }
       catch { operationError.value = `${operationError.value ?? '설정 쓰기 후'} Serial 연결을 정상적으로 종료하지 못했습니다.` }
       operationBusy.value = false; operationController = null
     }
+    if (!confirmedTarget) return
+    if (!disconnected) {
+      pendingConfiguration.value = Object.freeze({ kind, targetContext: confirmedTarget, delivery: 'acknowledged' })
+      return
+    }
+
+    // 상위 화면이 새 URL로 교체되면 선택된 port를 새 통신값으로 자동 연결한다.
+    onDeviceChanged(Object.freeze({
+      ...device.value,
+      slaveId: confirmedTarget.slaveId,
+      serialConfig: confirmedTarget.serialConfig,
+    }))
   }
 
   /** 사용자가 장비별 적용 절차를 마친 뒤 새 port를 선택하고 첫 측정 성공 시에만 TestDevice를 확정한다. */

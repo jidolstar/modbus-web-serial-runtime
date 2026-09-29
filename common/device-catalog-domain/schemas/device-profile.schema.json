@@ -19,7 +19,7 @@
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
-          "items": { "type": "integer", "minimum": 1 }
+          "items": { "enum": [1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200] }
         }
       }
     },
@@ -84,7 +84,7 @@
       "additionalProperties": false,
       "required": ["baudRate", "dataBits", "stopBits", "parity", "flowControl"],
       "properties": {
-        "baudRate": { "type": "integer", "minimum": 1 },
+        "baudRate": { "enum": [1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200] },
         "dataBits": { "enum": [7, 8] },
         "stopBits": { "enum": [1, 2] },
         "parity": { "enum": ["none", "even", "odd"] },

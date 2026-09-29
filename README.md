@@ -4,7 +4,7 @@
 
 표준적인 Modbus 장비는 실행 엔진이 지원하는 Step과 decoder 범위 안에서 JSON Profile/Recipe 등록만으로 추가하는 것을 목표로 합니다. 새로운 프로토콜 기능이 실제로 필요할 때만 실행 엔진을 확장합니다.
 
-현재 CWT-TH04S 온습도 센서의 측정, 장치 탐색 기반, Slave ID 및 baudrate 변경 workflow를 구현했습니다. Backend는 Google 인증과 서버 세션, MySQL migration, DB 기반 장비 Catalog 검증·관리 API, 썸네일·참고 파일·HTTPS 링크 관리를 제공합니다. Frontend는 인증된 runtime snapshot으로 활성 Catalog를 불러오며, 관리 화면에서 Catalog JSON·상태·썸네일·참고 파일·HTTPS 링크를 관리할 수 있습니다.
+현재 CWT-TH04S 온습도 센서의 측정, 장치 탐색 기반, Slave ID 및 baudrate 변경 workflow를 구현했습니다. Backend는 Google 인증과 서버 세션, MySQL migration, DB 기반 장비 Catalog 검증·관리 API, 썸네일·참고 파일·HTTPS 링크 관리를 제공합니다. Frontend는 인증된 runtime snapshot으로 활성 Catalog를 불러오며, 관리 화면에서 Catalog JSON·상태·썸네일·참고 파일·HTTPS 링크를 관리할 수 있습니다. 관리자는 별도 AI 작성 화면에서 요구사항과 참고 자료를 제출하고, 검증된 JSON 초안을 재검토하거나 승인하여 등록할 수 있습니다.
 
 ## 설계 원칙
 
@@ -70,6 +70,10 @@ Frontend와 Backend 소스는 컨테이너에 bind mount되어 변경 시 자동
 현재 Compose에는 데이터베이스 서비스를 포함하지 않습니다. Backend DB 연동 시 동일한 `shared-net`의 MySQL을 사용합니다.
 
 Catalog 첨부 파일은 `catalog_uploads` named volume에 저장됩니다. volume은 Backend에만 mount되며 Frontend web root에서는 직접 접근할 수 없습니다.
+
+AI 작성 기능은 Backend의 `GEMINI_API_KEY`와 `GEMINI_CATALOG_MODEL` 설정이 있을 때만 동작합니다. API key는 Frontend에 전달되지 않습니다. PDF·이미지 같은 바이너리 참고 자료는 Gemini Files API에 한 번 업로드한 뒤 같은 AI 세션의 재검토에서 재사용하며, 승인·작성 취소·세션 만료 시 provider 삭제를 시도합니다. 로컬 임시 자료는 60분 비활성 또는 생성 후 6시간이 지나면 10분 주기 청소 대상으로 처리됩니다. 브라우저 강제 종료처럼 즉시 정리를 보장할 수 없는 상황에서도 이 TTL이 최종 안전망이 됩니다.
+
+Gemini 요청·응답 감사 기록은 임시 파일과 수명이 다릅니다. 감사 row는 작성 취소로 지우지 않으며 `GEMINI_AUDIT_RETENTION_DAYS`에 설정한 1~365일 동안 보관한 뒤 Backend가 주기적으로 삭제합니다. 감사 기록을 조회하거나 삭제하는 별도 관리 UI는 제공하지 않습니다.
 
 두 서비스는 호스트 포트를 공개하지 않고 외부 Docker 네트워크 `shared-net`에만 연결됩니다.
 Cloudflare Tunnel의 서비스 대상은 `http://modbus-frontend:5173`과

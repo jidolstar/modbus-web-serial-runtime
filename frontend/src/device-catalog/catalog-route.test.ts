@@ -6,6 +6,8 @@ describe('catalog route', () => {
     expect(parseAppRoute({ pathname: '/catalogs', search: '' })).toEqual({ page: 'catalog-list' })
     expect(parseAppRoute({ pathname: '/catalogs', search: '?search=CWT%20sensor' })).toEqual({ page: 'catalog-list', search: 'CWT sensor' })
     expect(parseAppRoute({ pathname: '/catalogs/add', search: '' })).toEqual({ page: 'catalog-add' })
+    expect(parseAppRoute({ pathname: '/catalogs/ai-add', search: '' })).toEqual({ page: 'catalog-ai-add' })
+    expect(routeUrl({ page: 'catalog-ai-add' })).toBe('/catalogs/ai-add')
     expect(parseAppRoute({ pathname: '/scan', search: '' })).toEqual({ page: 'scan' })
     expect(parseAppRoute({ pathname: '/test-groups/12/run', search: '' })).toEqual({ page: 'test-group-run', groupId: 12 })
     expect(routeUrl({ page: 'test-group-edit', groupId: 12 })).toBe('/test-groups/12/edit')

@@ -3,6 +3,7 @@ export type AppRoute =
   | { readonly page: 'scan' }
   | { readonly page: 'catalog-list'; readonly search?: string }
   | { readonly page: 'catalog-add'; readonly observedBaudRate?: number; readonly observedSlaveId?: number }
+  | { readonly page: 'catalog-ai-add' }
   | { readonly page: 'catalog-view'; readonly catalogKey: string }
   | { readonly page: 'catalog-edit-json'; readonly catalogKey: string }
   | { readonly page: 'catalog-edit-thumbnail'; readonly catalogKey: string }
@@ -51,6 +52,7 @@ export function parseAppRoute(location: Pick<Location, 'pathname' | 'search'> = 
     }
     return route
   }
+  if (location.pathname === '/catalogs/ai-add') return { page: 'catalog-ai-add' }
   const editPageByPath = { // 수정 책임별 URL을 화면 상태로 변환한다. 예: "/catalogs/edit/files"
     '/catalogs/edit': 'catalog-edit-json',
     '/catalogs/edit/json': 'catalog-edit-json',
@@ -86,6 +88,7 @@ export function routeUrl(route: AppRoute): string {
     if (route.observedBaudRate && route.observedSlaveId) return `/catalogs/add?baudRate=${route.observedBaudRate}&slaveId=${route.observedSlaveId}`
     return '/catalogs/add'
   }
+  if (route.page === 'catalog-ai-add') return '/catalogs/ai-add'
   if (route.page === 'test-device') {
     const parameters = new URLSearchParams({
       name: route.name, catalog: route.catalogKey, revision: String(route.catalogRevision),

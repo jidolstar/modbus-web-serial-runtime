@@ -1,4 +1,4 @@
-import { open } from 'node:fs/promises'
+import { open, readFile } from 'node:fs/promises'
 import { extname } from 'node:path'
 import { TextDecoder } from 'node:util'
 import yauzl from 'yauzl'
@@ -13,6 +13,8 @@ interface AllowedFileType {
 const ALLOWED_FILE_TYPES: Readonly<Record<string, AllowedFileType>> = Object.freeze({
   '.pdf': { contentType: 'application/pdf', mimeAliases: ['application/pdf'] },
   '.txt': { contentType: 'text/plain', mimeAliases: ['text/plain'] },
+  '.md': { contentType: 'text/markdown', mimeAliases: ['text/markdown', 'text/plain', 'application/octet-stream'] },
+  '.json': { contentType: 'application/json', mimeAliases: ['application/json', 'text/json', 'text/plain', 'application/octet-stream'] },
   '.png': { contentType: 'image/png', mimeAliases: ['image/png'] },
   '.jpg': { contentType: 'image/jpeg', mimeAliases: ['image/jpeg'] },
   '.jpeg': { contentType: 'image/jpeg', mimeAliases: ['image/jpeg'] },
@@ -57,9 +59,14 @@ export class FileSafetyScanner {
     if ((extension === '.jpg' || extension === '.jpeg') && !(magic[0] === 0xff && magic[1] === 0xd8 && magic[2] === 0xff)) reject()
     if (extension === '.webp' && !(magic.subarray(0, 4).toString('ascii') === 'RIFF' && magic.subarray(8, 12).toString('ascii') === 'WEBP')) reject()
     if (extension === '.doc' && !startsWith(magic, OLE_MAGIC)) reject()
-    if (extension === '.txt') await this.assertUtf8Text(filePath)
+    if (['.txt', '.md', '.json'].includes(extension)) await this.assertUtf8Text(filePath)
+    if (extension === '.json') await this.assertJson(filePath)
     if (extension === '.docx') await this.assertSafeDocx(filePath, magic)
     return allowed.contentType
+  }
+
+  private async assertJson(filePath: string): Promise<void> {
+    try { JSON.parse(await readFile(filePath, 'utf8')) } catch { reject() }
   }
 
   private async assertUtf8Text(filePath: string): Promise<void> {

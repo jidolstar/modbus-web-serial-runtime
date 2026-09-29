@@ -69,4 +69,16 @@ describe('loadAppConfig', () => {
       ConfigurationError,
     )
   })
+
+  it('keeps Gemini optional and reads only bounded server settings', () => {
+    assert.deepEqual(loadAppConfig(validEnvironment).gemini, { configured: false, apiKey: undefined, model: 'gemini-3.5-flash-lite', timeoutMs: 300000, auditRetentionDays: 90 })
+    const configured = loadAppConfig({ ...validEnvironment, GEMINI_API_KEY: 'test-project-key', GEMINI_CATALOG_MODEL: 'gemini-3.5-flash-lite' })
+    assert.equal(configured.gemini.configured, true)
+    assert.equal(configured.gemini.apiKey, 'test-project-key')
+    assert.throws(() => loadAppConfig({ ...validEnvironment, GEMINI_CATALOG_TIMEOUT_MS: '1000' }), ConfigurationError)
+    assert.equal(loadAppConfig({ ...validEnvironment, GEMINI_AUDIT_RETENTION_DAYS: '1' }).gemini.auditRetentionDays, 1)
+    assert.equal(loadAppConfig({ ...validEnvironment, GEMINI_AUDIT_RETENTION_DAYS: '365' }).gemini.auditRetentionDays, 365)
+    assert.throws(() => loadAppConfig({ ...validEnvironment, GEMINI_AUDIT_RETENTION_DAYS: '0' }), ConfigurationError)
+    assert.throws(() => loadAppConfig({ ...validEnvironment, GEMINI_AUDIT_RETENTION_DAYS: '366' }), ConfigurationError)
+  })
 })

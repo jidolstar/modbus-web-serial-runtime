@@ -62,9 +62,11 @@ function openTestDevice(device: TestDevice): void {
 
   <section class="surface-card scan-config-panel">
     <div class="section-heading"><div><h2 class="help-label">스캔 범위 <HelpTooltip label="스캔 범위" :text="HELP_TOOLTIP_COPY.scanRange" /></h2></div></div>
-    <fieldset class="scan-baud-options" :disabled="scanning">
-      <legend><span class="help-label">Baudrate <HelpTooltip label="Baudrate" :text="HELP_TOOLTIP_COPY.baudRate" /></span></legend>
-      <label v-for="baudRate in availableBaudRates" :key="baudRate"><input v-model="selectedBaudRates" type="checkbox" :value="baudRate">{{ baudRate.toLocaleString() }}</label>
+    <fieldset class="form-field scan-baud-field" :disabled="scanning">
+      <legend class="field-label"><span class="help-label">Baudrate <HelpTooltip label="Baudrate" :text="HELP_TOOLTIP_COPY.baudRate" /></span></legend>
+      <div class="scan-baud-options">
+        <label v-for="baudRate in availableBaudRates" :key="baudRate"><input v-model="selectedBaudRates" type="checkbox" :value="baudRate">{{ baudRate.toLocaleString() }}</label>
+      </div>
     </fieldset>
     <div class="scan-range-fields">
       <div class="form-field"><span class="field-label"><label for="scan-slave-start">시작 Slave ID</label><HelpTooltip label="시작 Slave ID" :text="HELP_TOOLTIP_COPY.slaveId" /></span><input id="scan-slave-start" v-model.number="slaveIdStart" type="number" min="1" max="247" inputmode="numeric"></div>

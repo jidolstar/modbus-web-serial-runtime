@@ -12,6 +12,7 @@ const RecipeRegisterEncodingType = Object.freeze({ Signed16: 'int16' })
 const RecipeSchemaVersion = Object.freeze({ Version1: '1.0', Version2: '2.0' })
 const RecipeDecoderType = Object.freeze({ Unsigned16: 'uint16', Signed16: 'int16', Unsigned32: 'uint32', Signed32: 'int32', Float32: 'float32', Float64: 'float64', Bit: 'bit', Ascii: 'ascii', Hex: 'hex' })
 const STANDARD_DEVICE_ID_PARAMETER = 'deviceId'
+const STANDARD_MODBUS_BAUD_RATES = Object.freeze([1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200])
 
 /** Backend 런타임이 저장 전 Profile–Recipe 참조 무결성을 검사할 때 사용하는 CommonJS 진입점이다. */
 function validateCatalogBundleReferences(bundle) {
@@ -90,4 +91,4 @@ function validateCatalogBundleReferences(bundle) {
   return issues
 }
 
-module.exports = { RecipeKind, SerialParity, SerialFlowControl, RecipeApplyMode, RecipeStepType, RecipeRegisterEncodingType, RecipeSchemaVersion, RecipeDecoderType, STANDARD_DEVICE_ID_PARAMETER, validateCatalogBundleReferences }
+module.exports = { RecipeKind, SerialParity, SerialFlowControl, RecipeApplyMode, RecipeStepType, RecipeRegisterEncodingType, RecipeSchemaVersion, RecipeDecoderType, STANDARD_DEVICE_ID_PARAMETER, STANDARD_MODBUS_BAUD_RATES, validateCatalogBundleReferences }

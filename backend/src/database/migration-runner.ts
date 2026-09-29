@@ -14,6 +14,7 @@ import { renameCatalogDropDevicesMigration } from './migrations/20260923_004-ren
 import { addRetailerLinkTypeMigration } from './migrations/20260923_005-add-retailer-link-type'
 import { removeCatalogProbeMigration } from './migrations/20260924_006-remove-catalog-probe'
 import { testGroupsMigration } from './migrations/20260925_007-test-groups'
+import { catalogAiRequestsMigration } from './migrations/20260928_008-catalog-ai-requests'
 
 const MIGRATION_LOCK_NAME = 'modbus_manager_migrations'
 const MIGRATION_LOCK_TIMEOUT_SECONDS = 30
@@ -28,6 +29,7 @@ class StaticMigrationProvider implements MigrationProvider {
       '20260923_005-add-retailer-link-type': addRetailerLinkTypeMigration,
       '20260924_006-remove-catalog-probe': removeCatalogProbeMigration,
       '20260925_007-test-groups': testGroupsMigration,
+      '20260928_008-catalog-ai-requests': catalogAiRequestsMigration,
     }
   }
 }

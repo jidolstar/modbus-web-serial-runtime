@@ -74,7 +74,7 @@ watch(() => props.search, (search) => { query.value = search; void loadCatalogs(
 <template>
   <header class="page-heading">
     <div><p class="eyebrow">DEVICE CATALOG</p><h1>장비 카탈로그</h1><p class="description">Profile과 Recipe JSON, 제품 자료를 DB에서 관리합니다.</p></div>
-    <button class="button button-primary button-small" type="button" @click="emit('navigate', { page: 'catalog-add' })">새 카탈로그</button>
+    <div class="inline-actions"><button class="button button-secondary button-small" type="button" @click="emit('navigate', { page: 'catalog-ai-add' })">AI로 작성</button><button class="button button-primary button-small" type="button" @click="emit('navigate', { page: 'catalog-add' })">직접 등록</button></div>
   </header>
   <div v-if="notice" class="notice error"><span>{{ notice }}</span><button v-if="listFailed" class="button button-ghost button-small" type="button" @click="loadCatalogs()">다시 시도</button></div>
   <section class="catalog-toolbar surface-card">

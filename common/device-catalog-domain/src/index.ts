@@ -26,6 +26,8 @@ export enum RecipeFormatterType { Number = 'number', Text = 'text', Boolean = 'b
 export enum RecipeErrorPolicy { Stop = 'stop' }
 
 export const STANDARD_DEVICE_ID_PARAMETER = 'deviceId'
+/** 제품 Catalog와 Scan이 공통으로 허용하는 Modbus RTU baudrate 목록이다. */
+export const STANDARD_MODBUS_BAUD_RATES = Object.freeze([1_200, 2_400, 4_800, 9_600, 19_200, 38_400, 57_600, 115_200] as const)
 
 export interface SerialConfig {
   readonly baudRate: number
@@ -110,6 +112,33 @@ export interface CatalogBundle {
   readonly bundleVersion: CatalogBundleSchemaVersion
   readonly profile: DeviceProfile
   readonly recipes: ReadonlyArray<Recipe>
+}
+
+/** AI가 생성하고 서버가 검토 화면에 전달하는 참고 출처다. URL은 Backend의 public HTTPS 검증을 통과해야 한다. */
+export interface CatalogAiSource {
+  readonly title: string // 사용자가 출처를 구분하는 표시 이름. 예: "제조사 매뉴얼"
+  readonly url: string // Catalog 참고 링크로 승격 가능한 public HTTPS URL. 예: "https://example.com/manual"
+}
+
+/** Gemini Structured Outputs가 반환하는 원본 envelope 계약이다. validation은 서버가 별도로 추가한다. */
+export interface CatalogAiProposalEnvelope {
+  readonly title: string // 승인 시 Catalog 표시 제목으로 저장할 후보
+  readonly definition: unknown // 신뢰하지 않는 AI 결과이며 서버 Catalog 검증을 통과하기 전에는 실행하지 않는다.
+  readonly warnings: ReadonlyArray<string> // 근거 부족이나 제외한 기능처럼 사용자가 확인해야 하는 한계
+  readonly assumptions: ReadonlyArray<string> // 문서 해석 과정에서 적용한 명시적 가정
+  readonly sources: ReadonlyArray<CatalogAiSource> // AI가 참고했다고 반환한 출처 후보
+}
+
+/** 기존 CatalogValidationService가 AI definition을 검사한 결과다. Gemini가 직접 작성하지 않는다. */
+export interface CatalogAiValidation {
+  readonly valid: boolean // true이면 현재 proposal을 승인 endpoint로 보낼 수 있음
+  readonly fields: ReadonlyArray<string> // 실패한 공개 JSON path. 예: "/profile/serial"
+  readonly issues: ReadonlyArray<CatalogValidationIssue> // 사용자가 원인과 수정 위치를 이해하고 AI 재검토에 전달할 공개 설명
+}
+
+/** AI 등록 화면과 Backend job API가 공유하는 최종 proposal 응답 계약이다. */
+export interface CatalogAiProposal extends CatalogAiProposalEnvelope {
+  readonly validation: CatalogAiValidation
 }
 
 export interface CatalogValidationIssue { readonly path: string; readonly message: string }
