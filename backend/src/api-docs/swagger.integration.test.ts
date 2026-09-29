@@ -25,6 +25,8 @@ describe('Swagger integration', { skip: !runIntegrationTests }, () => {
       '/api/catalogs/ai/jobs/{jobId}',
       '/api/catalogs/ai/sessions/{sessionId}',
       '/api/catalogs/ai/sessions/{sessionId}/approve',
+      '/api/catalogs/ai/edit/{catalogKey}/jobs',
+      '/api/catalogs/ai/edit/{catalogKey}/sessions/{sessionId}/approve',
       '/api/catalogs/{catalogKey}',
       '/api/catalogs/{catalogKey}/status',
       '/api/catalogs/{catalogKey}/thumbnail',

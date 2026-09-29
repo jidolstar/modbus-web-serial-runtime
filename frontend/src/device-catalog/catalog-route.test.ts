@@ -8,6 +8,8 @@ describe('catalog route', () => {
     expect(parseAppRoute({ pathname: '/catalogs/add', search: '' })).toEqual({ page: 'catalog-add' })
     expect(parseAppRoute({ pathname: '/catalogs/ai-add', search: '' })).toEqual({ page: 'catalog-ai-add' })
     expect(routeUrl({ page: 'catalog-ai-add' })).toBe('/catalogs/ai-add')
+    expect(parseAppRoute({ pathname: '/catalogs/ai-edit', search: '?id=cwt-th04s' })).toEqual({ page: 'catalog-ai-edit', catalogKey: 'cwt-th04s' })
+    expect(routeUrl({ page: 'catalog-ai-edit', catalogKey: 'cwt-th04s' })).toBe('/catalogs/ai-edit?id=cwt-th04s')
     expect(parseAppRoute({ pathname: '/scan', search: '' })).toEqual({ page: 'scan' })
     expect(parseAppRoute({ pathname: '/test-groups/12/run', search: '' })).toEqual({ page: 'test-group-run', groupId: 12 })
     expect(routeUrl({ page: 'test-group-edit', groupId: 12 })).toBe('/test-groups/12/edit')
@@ -25,6 +27,7 @@ describe('catalog route', () => {
 
   it('rejects an unsafe or missing Catalog key instead of sending it to the API', () => {
     expect(parseAppRoute({ pathname: '/catalogs/view', search: '?id=../../secret' })).toEqual({ page: 'catalog-list' })
+    expect(parseAppRoute({ pathname: '/catalogs/ai-edit', search: '?id=../../secret' })).toEqual({ page: 'catalog-list' })
     expect(parseAppRoute({ pathname: '/catalogs/edit/links', search: '' })).toEqual({ page: 'catalog-list' })
     expect(parseAppRoute({ pathname: '/catalogs', search: `?search=${'a'.repeat(101)}` })).toEqual({ page: 'catalog-list' })
     expect(parseAppRoute({ pathname: '/catalogs/add', search: '?baudRate=javascript&slaveId=-1' })).toEqual({ page: 'catalog-add' })

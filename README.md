@@ -71,7 +71,7 @@ Frontend와 Backend 소스는 컨테이너에 bind mount되어 변경 시 자동
 
 Catalog 첨부 파일은 `catalog_uploads` named volume에 저장됩니다. volume은 Backend에만 mount되며 Frontend web root에서는 직접 접근할 수 없습니다.
 
-AI 작성 기능은 Backend의 `GEMINI_API_KEY`와 `GEMINI_CATALOG_MODEL` 설정이 있을 때만 동작합니다. API key는 Frontend에 전달되지 않습니다. PDF·이미지 같은 바이너리 참고 자료는 Gemini Files API에 한 번 업로드한 뒤 같은 AI 세션의 재검토에서 재사용하며, 승인·작성 취소·세션 만료 시 provider 삭제를 시도합니다. 로컬 임시 자료는 60분 비활성 또는 생성 후 6시간이 지나면 10분 주기 청소 대상으로 처리됩니다. 브라우저 강제 종료처럼 즉시 정리를 보장할 수 없는 상황에서도 이 TTL이 최종 안전망이 됩니다.
+AI 작성·수정 기능은 Backend의 `GEMINI_API_KEY`와 `GEMINI_CATALOG_MODEL` 설정이 있을 때만 동작합니다. AI 수정은 기존 Catalog JSON과 등록된 제품 이미지·참고 파일·HTTPS 링크를 참고하며, 제품 키는 변경하지 않고 현재 revision과 일치할 때만 수정안을 적용합니다. API key는 Frontend에 전달되지 않습니다. PDF·이미지 같은 바이너리 참고 자료는 Gemini Files API에 한 번 업로드한 뒤 같은 AI 세션의 재검토에서 재사용하며, 승인·작성 취소·세션 만료 시 provider 삭제를 시도합니다. 로컬 임시 자료는 60분 비활성 또는 생성 후 6시간이 지나면 10분 주기 청소 대상으로 처리됩니다. 브라우저 강제 종료처럼 즉시 정리를 보장할 수 없는 상황에서도 이 TTL이 최종 안전망이 됩니다.
 
 Gemini 요청·응답 감사 기록은 임시 파일과 수명이 다릅니다. 감사 row는 작성 취소로 지우지 않으며 `GEMINI_AUDIT_RETENTION_DAYS`에 설정한 1~365일 동안 보관한 뒤 Backend가 주기적으로 삭제합니다. 감사 기록을 조회하거나 삭제하는 별도 관리 UI는 제공하지 않습니다.
 

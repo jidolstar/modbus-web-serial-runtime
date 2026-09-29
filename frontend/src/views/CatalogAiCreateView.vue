@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { AppRoute } from '../device-catalog/catalog-route'
-import { CatalogApiError } from '../device-catalog/catalog-api'
+import { catalogApi, CatalogApiError } from '../device-catalog/catalog-api'
 import FileDropField from '../components/FileDropField.vue'
 import CatalogAiReviewDialog from '../features/catalogs/CatalogAiReviewDialog.vue'
 import CatalogAiCancelDialog from '../features/catalogs/CatalogAiCancelDialog.vue'
@@ -11,6 +11,10 @@ import { appendCatalogAiRevision, type CatalogAiRevisionSummary } from '../devic
 type CatalogAiPhase = 'editing' | 'uploading' | 'queued' | 'generating' | 'validating' | 'reviewing' | 'approving'
 
 const emit = defineEmits<{ navigate: [route: AppRoute] }>()
+const props = defineProps<{
+  readonly mode: 'create' | 'edit' // Dashboard route가 화면 목적을 명시해 선택적 key 유무로 작성·수정을 추론하지 않는다.
+  readonly catalogKey?: string
+}>()
 
 // 이 component가 페이지를 떠날 때까지 입력, 최신 proposal과 재검토 이력을 소유한다. 서버에는 임시 파일과 job만 보관한다.
 const requirements = ref('')
@@ -24,6 +28,11 @@ const proposalDigest = ref<string>()
 const revisionHistory = ref<readonly CatalogAiRevisionSummary[]>([])
 const phase = ref<CatalogAiPhase>('editing')
 const notice = ref<string>()
+const baseRevision = ref<number>()
+const catalogTitle = ref('')
+const thumbnailPreviewUrl = ref<string>()
+const isEdit = computed(() => props.mode === 'edit')
+const initializing = ref(isEdit.value)
 
 // generationToken은 이전 polling loop가 새 요청이나 취소 이후의 화면 상태를 덮어쓰지 못하게 한다.
 let generationToken = 0
@@ -37,7 +46,48 @@ const discarding = ref(false)
 const busy = computed(() => ['uploading', 'queued', 'generating', 'validating', 'approving'].includes(phase.value))
 const revision = computed(() => revisionHistory.value.length)
 const urls = computed(() => urlsText.value.split(/\r?\n/).map((value) => value.trim()).filter(Boolean))
-const hasGenerationSource = computed(() => Boolean(requirements.value.trim() || urls.value.length || pendingFiles.value.length || uploadedFiles.value.length))
+const hasGenerationSource = computed(() => isEdit.value
+  ? Boolean(requirements.value.trim())
+  : Boolean(requirements.value.trim() || urls.value.length || pendingFiles.value.length || uploadedFiles.value.length))
+
+/** AI 수정 진입 때 현재 링크·clean 파일·제품 이미지를 기존 Catalog API로 읽어 최초 참고 자료에 채운다. */
+async function loadEditSources(): Promise<void> {
+  if (!isEdit.value) return
+  if (!props.catalogKey) {
+    notice.value = '수정할 카탈로그 제품 키가 없습니다.'
+    initializing.value = false
+    return
+  }
+  try {
+    const [detail, files, links, thumbnail] = await Promise.all([
+      catalogApi.get(props.catalogKey), catalogApi.listFiles(props.catalogKey), catalogApi.listLinks(props.catalogKey), catalogApi.getThumbnailBlob(props.catalogKey),
+    ])
+    baseRevision.value = detail.revision
+    catalogTitle.value = detail.title
+    urlsText.value = links.map(({ url }) => url).slice(0, 10).join('\n')
+    const sourceFiles: File[] = []
+    let sourceBytes = 0
+    if (thumbnail) {
+      thumbnailPreviewUrl.value = URL.createObjectURL(thumbnail)
+      sourceFiles.push(new File([thumbnail], 'product-thumbnail.jpg', { type: thumbnail.type || 'image/jpeg' }))
+      sourceBytes += thumbnail.size
+    }
+    for (const file of files.filter(({ status }) => status === 'clean')) {
+      if (sourceFiles.length >= 5 || sourceBytes + file.byteSize > 20 * 1024 * 1024) break
+      const blob = await catalogApi.downloadFile(props.catalogKey, file)
+      sourceFiles.push(new File([blob], file.originalName, { type: file.contentType }))
+      sourceBytes += blob.size
+    }
+    pendingFiles.value = sourceFiles
+    if (files.filter(({ status }) => status === 'clean').length > sourceFiles.length - (thumbnail ? 1 : 0) || links.length > 10) {
+      notice.value = 'AI 입력 제한에 맞춰 최근 참고 파일과 URL만 포함했습니다. 필요한 자료는 수정 지시와 함께 추가해 주세요.'
+    }
+  } catch (error) {
+    notice.value = error instanceof CatalogApiError && error.status === 404 ? '수정할 카탈로그를 찾을 수 없습니다.' : '기존 카탈로그 자료를 불러오지 못했습니다.'
+  } finally {
+    initializing.value = false
+  }
+}
 
 function chooseFiles(files: readonly File[]): void {
   const existing = new Set(pendingFiles.value.map((file) => `${file.name}:${file.size}:${file.lastModified}`))
@@ -73,6 +123,9 @@ function message(error: unknown): string {
   }
   if (error instanceof CatalogApiError && error.code === 'CATALOG_FILE_TYPE_REJECTED') {
     return '지원하지 않거나 안전 검사를 통과하지 못한 파일입니다.'
+  }
+  if (error instanceof CatalogApiError && error.code === 'CATALOG_REVISION_CONFLICT') {
+    return '다른 곳에서 먼저 수정했습니다. 현재 수정안은 유지되지만 최신 상세를 확인한 뒤 다시 시작해 주세요.'
   }
   return 'AI 카탈로그 요청을 처리하지 못했습니다. 입력을 유지했으니 다시 시도해 주세요.'
 }
@@ -114,14 +167,22 @@ async function generate(
 
   try {
     const mergedUrls = [...new Set([...urls.value, ...additionalUrls])]
-    const accepted = await catalogAiApi.createJob({
+    const accepted = isEdit.value && props.catalogKey
+      ? await catalogAiApi.createEditJob(props.catalogKey, {
+        revisionInstruction: revisionInstruction?.trim() || requirements.value.trim(),
+        referenceUrls: mergedUrls,
+        files: [...pendingFiles.value, ...additionalFiles],
+        sessionId: sessionId.value,
+        previousProposal: isReview ? previousProposal : undefined,
+      })
+      : await catalogAiApi.createJob({
       requirements: requirements.value.trim(),
       referenceUrls: mergedUrls,
       files: [...pendingFiles.value, ...additionalFiles],
       sessionId: sessionId.value,
       revisionInstruction,
       previousProposal: isReview ? previousProposal : undefined,
-    })
+      })
 
     if (additionalUrls.length > 0) urlsText.value = mergedUrls.join('\n')
     sessionId.value = accepted.sessionId
@@ -178,12 +239,9 @@ async function approve(fileIds: readonly string[], retainedUrls: readonly string
   phase.value = 'approving'
   notice.value = undefined
   try {
-    const created = await catalogAiApi.approve(sessionId.value, {
-      jobId: jobId.value,
-      proposalDigest: proposalDigest.value,
-      retainedFileIds: fileIds,
-      retainedUrls,
-    })
+    const created = isEdit.value && props.catalogKey && baseRevision.value
+      ? await catalogAiApi.approveEdit(props.catalogKey, sessionId.value, { jobId: jobId.value, proposalDigest: proposalDigest.value, baseRevision: baseRevision.value })
+      : await catalogAiApi.approve(sessionId.value, { jobId: jobId.value, proposalDigest: proposalDigest.value, retainedFileIds: fileIds, retainedUrls })
     // 승인 service가 session을 이미 폐기하므로 unmount의 best-effort DELETE가 중복 호출되지 않게 한다.
     sessionId.value = undefined
     jobId.value = undefined
@@ -229,7 +287,7 @@ function clearDraftState(): void {
 function leaveForCatalogList(): void {
   if (!sessionId.value && !proposal.value && !busy.value) {
     clearDraftState()
-    emit('navigate', { page: 'catalog-list' })
+    emit('navigate', props.catalogKey ? { page: 'catalog-view', catalogKey: props.catalogKey } : { page: 'catalog-list' })
     return
   }
   requestDiscard()
@@ -248,7 +306,7 @@ async function discardDraft(): Promise<void> {
     if (sessionId.value) await catalogAiApi.discardSession(sessionId.value)
     // 서버 자원 정리가 끝난 시점에 modal을 먼저 제거하고, 그 다음 비동기 상위 navigation을 요청한다.
     clearDraftState()
-    emit('navigate', { page: 'catalog-list' })
+    emit('navigate', props.catalogKey ? { page: 'catalog-view', catalogKey: props.catalogKey } : { page: 'catalog-list' })
   } catch (error) {
     confirmingDiscard.value = false
     proposal.value = suspendedProposal?.proposal ?? proposal.value
@@ -270,46 +328,62 @@ onBeforeUnmount(() => {
   stopElapsed()
   if (jobId.value && busy.value) void catalogAiApi.cancel(jobId.value).catch(() => undefined)
   if (sessionId.value) void catalogAiApi.discardSession(sessionId.value).catch(() => undefined)
+  if (thumbnailPreviewUrl.value) URL.revokeObjectURL(thumbnailPreviewUrl.value)
 })
+onMounted(loadEditSources)
 </script>
 
 <template>
-  <button class="text-link" type="button" @click="leaveForCatalogList">← 목록으로</button>
+  <button class="text-link" type="button" @click="leaveForCatalogList">← {{ isEdit ? '상세로' : '목록으로' }}</button>
   <header class="page-heading">
     <div>
-      <p class="eyebrow">AI CATALOG BUILDER</p>
-      <h1>AI로 카탈로그 작성</h1>
-      <p class="description">공식 자료와 선택 설명을 바탕으로 CatalogBundle JSON 초안을 만들고 검토 후 등록합니다.</p>
+      <p class="eyebrow">{{ isEdit ? 'AI CATALOG EDITOR' : 'AI CATALOG BUILDER' }}</p>
+      <h1>{{ isEdit ? 'AI로 카탈로그 수정' : 'AI로 카탈로그 작성' }}</h1>
+      <p class="description">{{ isEdit ? `${catalogTitle || props.catalogKey}의 기존 JSON과 등록 자료를 바탕으로 수정안을 만들고 검토 후 적용합니다.` : '공식 자료와 선택 설명을 바탕으로 CatalogBundle JSON 초안을 만들고 검토 후 등록합니다.' }}</p>
     </div>
   </header>
   <div v-if="notice" class="notice error">{{ notice }}</div>
-  <section class="surface-card ai-catalog-form">
-    <div class="ai-form-field">
-      <strong>문서·이미지</strong>
-      <small>PDF, TXT, MD, JSON, DOC/DOCX, PNG, JPEG, WebP · 최대 5개/총 20MB</small>
-      <FileDropField
-        id="catalog-ai-source-files"
-        multiple
-        accept=".pdf,.txt,.md,.json,.doc,.docx,.png,.jpg,.jpeg,.webp"
-        :disabled="busy"
-        prompt="문서나 이미지를 이 영역에 끌어놓거나 파일 선택 버튼을 눌러 주세요."
-        @files="chooseFiles"
-      />
+  <p v-if="initializing" class="empty-panel surface-card">기존 카탈로그 자료를 불러오는 중입니다.</p>
+  <section v-else class="surface-card ai-catalog-form">
+    <div v-if="isEdit" class="readonly-product-key">
+      <span>제품 키</span>
+      <strong>{{ props.catalogKey }}</strong>
+      <small>제품 키는 변경할 수 없습니다.</small>
     </div>
-    <ul v-if="pendingFiles.length" class="ai-file-list">
-      <li v-for="(file, index) in pendingFiles" :key="`${file.name}-${file.size}`">
-        <span>{{ file.name }} · {{ Math.ceil(file.size / 1024) }}KB</span>
-        <button type="button" aria-label="선택 파일 제거" @click="removePendingFile(index)">제거</button>
-      </li>
-    </ul>
+    <div class="ai-source-layout" :class="{ 'with-thumbnail': isEdit && thumbnailPreviewUrl }">
+      <div class="ai-source-upload">
+        <div class="ai-form-field">
+          <strong>문서·이미지</strong>
+          <small>PDF, TXT, MD, JSON, DOC/DOCX, PNG, JPEG, WebP · 최대 5개/총 20MB</small>
+          <FileDropField
+            id="catalog-ai-source-files"
+            multiple
+            accept=".pdf,.txt,.md,.json,.doc,.docx,.png,.jpg,.jpeg,.webp"
+            :disabled="busy"
+            prompt="문서나 이미지를 이 영역에 끌어놓거나 파일 선택 버튼을 눌러 주세요."
+            @files="chooseFiles"
+          />
+        </div>
+        <ul v-if="pendingFiles.length" class="ai-file-list">
+          <li v-for="(file, index) in pendingFiles" :key="`${file.name}-${file.size}`">
+            <span>{{ file.name }} · {{ Math.ceil(file.size / 1024) }}KB</span>
+            <button type="button" aria-label="선택 파일 제거" @click="removePendingFile(index)">제거</button>
+          </li>
+        </ul>
+      </div>
+      <figure v-if="isEdit && thumbnailPreviewUrl" class="ai-thumbnail-preview">
+        <figcaption>현재 제품 썸네일</figcaption>
+        <img :src="thumbnailPreviewUrl" :alt="`${catalogTitle} 제품 썸네일`">
+      </figure>
+    </div>
     <label>참고 URL <small>한 줄에 하나씩 public HTTPS 주소를 입력하세요.</small><textarea v-model="urlsText" maxlength="21000" rows="4" placeholder="https://example.com/manual"></textarea></label>
-    <label>추가 설명 <small>선택 사항입니다. 자료만으로 부족한 제조사·모델·필요 기능을 보완하세요.</small><textarea v-model="requirements" maxlength="10000" rows="6" placeholder="자료에 없거나 특별히 반영해야 할 내용을 입력하세요."></textarea></label>
+    <label>{{ isEdit ? '무엇을 수정하기 원하는지' : '추가 설명' }} <small>{{ isEdit ? '필수 사항입니다. 변경할 내용을 구체적으로 입력하세요.' : '선택 사항입니다. 자료만으로 부족한 제조사·모델·필요 기능을 보완하세요.' }}</small><textarea v-model="requirements" :maxlength="isEdit ? 5000 : 10000" rows="6" :required="isEdit" :placeholder="isEdit ? '예: 측정값 표시를 소수점 한 자리로 변경해 주세요.' : '자료에 없거나 특별히 반영해야 할 내용을 입력하세요.'"></textarea></label>
     <div v-if="busy" class="ai-progress" role="status" aria-live="polite">
       <strong>{{ phase === 'uploading' ? '자료 업로드 중' : phase === 'queued' ? 'AI 대기 중' : phase === 'generating' ? 'JSON 생성 중' : phase === 'validating' ? '서버 검증 중' : '등록 중' }}</strong>
       <span>{{ elapsedSeconds }}초 경과 · 수십 초에서 수분이 걸릴 수 있습니다.</span>
     </div>
     <div class="inline-actions">
-      <button class="button button-primary" type="button" :disabled="busy || !hasGenerationSource" @click="generate()">JSON 생성</button>
+      <button class="button button-primary" type="button" :disabled="busy || !hasGenerationSource" @click="generate()">{{ isEdit ? 'AI 수정안 생성' : 'JSON 생성' }}</button>
       <button v-if="busy && phase !== 'approving'" class="button button-ghost" type="button" @click="cancelJob">취소</button>
     </div>
   </section>
@@ -320,6 +394,7 @@ onBeforeUnmount(() => {
     :approving="phase === 'approving'"
     :revision="revision"
     :history="revisionHistory"
+    :edit-mode="isEdit"
     @approve="approve"
     @review="requestReview"
     @cancel="requestDiscard"

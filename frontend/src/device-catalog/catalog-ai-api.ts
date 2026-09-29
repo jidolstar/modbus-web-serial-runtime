@@ -116,6 +116,28 @@ export class CatalogAiApiClient {
     }
   }
 
+  /** AI 수정 화면이 제품 키를 URL에만 고정하고 필수 수정 지시로 기존 Catalog 수정 job을 시작한다. */
+  public async createEditJob(catalogKey: string, input: {
+    revisionInstruction: string
+    referenceUrls: readonly string[]
+    files: readonly File[]
+    sessionId?: string
+    previousProposal?: CatalogAiProposal
+  }): Promise<CatalogAiJobAccepted> {
+    const form = new FormData()
+    form.append('revisionInstruction', input.revisionInstruction)
+    form.append('referenceUrls', JSON.stringify(input.referenceUrls))
+    if (input.sessionId) form.append('sessionId', input.sessionId)
+    if (input.previousProposal) form.append('previousProposal', JSON.stringify(input.previousProposal))
+    for (const file of input.files) form.append('files', file)
+    const value = await this.json(`catalogs/ai/edit/${encodeURIComponent(catalogKey)}/jobs`, { method: 'POST', body: form })
+    if (!isRecord(value) || typeof value.jobId !== 'string' || typeof value.sessionId !== 'string'
+      || value.status !== 'queued' || !Array.isArray(value.files) || !value.files.every(isCatalogAiFile)) {
+      throw new CatalogApiError(502, 'INVALID_RESPONSE')
+    }
+    return { jobId: value.jobId, sessionId: value.sessionId, status: 'queued', files: value.files }
+  }
+
   /** 작성 화면 polling이 호출하며 완료 전에는 상태만, 완료 뒤에는 proposal과 digest를 반환한다. */
   public async getJob(jobId: string): Promise<CatalogAiJobState> {
     const value = await this.json(`catalogs/ai/jobs/${encodeURIComponent(jobId)}`)
@@ -159,6 +181,19 @@ export class CatalogAiApiClient {
     if (!isRecord(value) || typeof value.catalogKey !== 'string' || !Number.isInteger(value.revision)) {
       throw new CatalogApiError(502, 'INVALID_RESPONSE')
     }
+    return { catalogKey: value.catalogKey, revision: Number(value.revision) }
+  }
+
+  /** 검토된 AI 수정안을 기준 revision과 함께 보내며 제품 키는 body에서 변경할 수 없게 한다. */
+  public async approveEdit(catalogKey: string, sessionId: string, input: {
+    jobId: string
+    proposalDigest: string
+    baseRevision: number
+  }): Promise<{ catalogKey: string; revision: number }> {
+    const value = await this.json(`catalogs/ai/edit/${encodeURIComponent(catalogKey)}/sessions/${encodeURIComponent(sessionId)}/approve`, {
+      method: 'POST', body: JSON.stringify(input), headers: { 'Content-Type': 'application/json' },
+    })
+    if (!isRecord(value) || typeof value.catalogKey !== 'string' || !Number.isInteger(value.revision)) throw new CatalogApiError(502, 'INVALID_RESPONSE')
     return { catalogKey: value.catalogKey, revision: Number(value.revision) }
   }
 

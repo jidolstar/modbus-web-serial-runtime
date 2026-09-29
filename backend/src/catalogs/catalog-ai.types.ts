@@ -24,6 +24,7 @@ export interface CatalogAiJob {
   readonly ownerUserId: number
   readonly requesterEmail: string
   readonly createdAt: number
+  readonly editTarget?: { readonly catalogKey: string; readonly baseRevision: number } // AI 수정 job이 덮어쓸 수 있는 Catalog와 기준 revision을 서버가 고정한다.
   status: CatalogAiJobStatus
   upstreamResponseId?: string
   proposal?: CatalogAiProposal

@@ -91,4 +91,27 @@ export class CatalogAiApprovalService {
       throw error
     }
   }
+
+  /** AI 수정 검토 승인이 호출하며 session에 고정된 제품 키와 revision으로 기존 Catalog만 갱신한다. */
+  public async approveEdit(
+    catalogKey: string,
+    sessionId: string,
+    input: { readonly jobId: string; readonly proposalDigest: string; readonly baseRevision: number },
+    user: { readonly id: number },
+  ): Promise<{ readonly catalogKey: string; readonly revision: number }> {
+    const session = this.sessions.require(sessionId, user.id)
+    const job = this.ai.getJob(input.jobId, user.id)
+    if (job.sessionId !== sessionId || job.status !== 'completed' || !job.proposal
+      || job.proposalDigest !== input.proposalDigest || !job.proposal.validation.valid
+      || !job.editTarget || job.editTarget.catalogKey !== catalogKey || job.editTarget.baseRevision !== input.baseRevision) {
+      throw new CatalogError(CATALOG_ERROR_CODES.aiJobNotReady, 409)
+    }
+    const updated = await this.catalogs.update(catalogKey, {
+      title: job.proposal.title,
+      definition: job.proposal.definition,
+      revision: input.baseRevision,
+    }, user.id)
+    await this.sessions.discard(session.id, user.id)
+    return { catalogKey: updated.catalogKey, revision: updated.revision }
+  }
 }

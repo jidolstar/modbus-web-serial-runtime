@@ -44,8 +44,14 @@ export function parseCatalogAiTextInput(fields: Readonly<Record<string, string>>
 
 /** 설명·공개 URL·세션 첨부 중 하나도 없으면 AI가 근거 없이 장비 정보를 추측하므로 요청을 거부한다. */
 export function assertCatalogAiSource(input: CatalogAiTextInput, sessionFileCount: number): void {
-  if (input.requirements || input.referenceUrls.length > 0 || sessionFileCount > 0) return
+  if (input.requirements || input.revisionInstruction || input.referenceUrls.length > 0 || sessionFileCount > 0) return
   throw new CatalogError(CATALOG_ERROR_CODES.aiInvalidInput, 400, ['requirements', 'referenceUrls', 'files'])
+}
+
+/** AI 수정 최초 요청은 기존 자료가 있어도 사용자가 원하는 변경 내용을 반드시 설명하도록 강제한다. */
+export function assertCatalogAiEditInstruction(input: CatalogAiTextInput): void {
+  if (input.revisionInstruction?.trim()) return
+  throw new CatalogError(CATALOG_ERROR_CODES.aiInvalidInput, 400, ['revisionInstruction'])
 }
 
 /** 승인 body는 완료 proposal과 같은 세션 자료만 선택할 수 있도록 식별자 shape를 제한한다. */
@@ -59,4 +65,16 @@ export function parseCatalogAiApproval(value: unknown): { readonly jobId: string
     throw new CatalogError(CATALOG_ERROR_CODES.aiInvalidInput, 400, unexpected.length ? unexpected : ['body'])
   }
   return { jobId: body.jobId, proposalDigest: body.proposalDigest, retainedFileIds: body.retainedFileIds, retainedUrls: body.retainedUrls }
+}
+
+/** AI 수정 승인은 제품 키를 body로 받지 않고 완료 proposal 식별자와 기준 revision만 허용한다. */
+export function parseCatalogAiEditApproval(value: unknown): { readonly jobId: string; readonly proposalDigest: string; readonly baseRevision: number } {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new CatalogError(CATALOG_ERROR_CODES.aiInvalidInput, 400, ['body'])
+  const body = value as Record<string, unknown>
+  const unexpected = Object.keys(body).filter((key) => !['jobId', 'proposalDigest', 'baseRevision'].includes(key))
+  if (unexpected.length || typeof body.jobId !== 'string' || typeof body.proposalDigest !== 'string'
+    || !Number.isInteger(body.baseRevision) || Number(body.baseRevision) < 1) {
+    throw new CatalogError(CATALOG_ERROR_CODES.aiInvalidInput, 400, unexpected.length ? unexpected : ['body'])
+  }
+  return { jobId: body.jobId, proposalDigest: body.proposalDigest, baseRevision: Number(body.baseRevision) }
 }

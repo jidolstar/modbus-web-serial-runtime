@@ -30,3 +30,12 @@ export class CatalogAiApprovalResponseDto {
   @ApiProperty({ type: [Number], example: [12] }) promotedFileIds!: number[]
   @ApiProperty({ type: [Number], example: [8] }) createdLinkIds!: number[]
 }
+export class CatalogAiEditApprovalRequestDto {
+  @ApiProperty({ example: '5c43a77e-09df-4a6a-a5f4-3d90618c85aa' }) jobId!: string
+  @ApiProperty({ example: '73f1070f052dd86bb0105ad14a3b938d7316a73e48aa819873455b67d52da8e5' }) proposalDigest!: string
+  @ApiProperty({ example: 3, minimum: 1, description: 'AI 수정 시작 때 조회한 낙관적 잠금 revision' }) baseRevision!: number
+}
+export class CatalogAiEditApprovalResponseDto {
+  @ApiProperty({ example: 'example-temperature-sensor', description: '수정 전후 동일하게 유지되는 제품 키' }) catalogKey!: string
+  @ApiProperty({ example: 4 }) revision!: number
+}

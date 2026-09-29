@@ -72,7 +72,8 @@ onBeforeUnmount(() => { window.removeEventListener('popstate', handlePopState); 
       <section class="surface-card dashboard-start"><div><p class="eyebrow">GET STARTED</p><h2>연결할 장비에 맞는 방법으로 시작하세요</h2><p class="description">장비 모델과 통신 설정을 알고 있다면 Catalog를 선택하고, 알 수 없다면 먼저 장비 Scan을 실행합니다.</p></div><div class="inline-actions"><button class="button button-primary" type="button" @click="navigate({ page: 'catalog-list' })">장비 Catalog 보기</button><button class="button button-ghost" type="button" @click="navigate({ page: 'scan' })">장비 Scan 시작</button></div></section>
     </template>
     <CatalogManagementView v-else-if="route.page === 'catalog-list'" :search="route.search" @navigate="navigate" />
-    <CatalogAiCreateView v-else-if="route.page === 'catalog-ai-add'" @navigate="navigate" />
+    <CatalogAiCreateView v-else-if="route.page === 'catalog-ai-add'" mode="create" @navigate="navigate" />
+    <CatalogAiCreateView v-else-if="route.page === 'catalog-ai-edit'" mode="edit" :catalog-key="route.catalogKey" @navigate="navigate" />
     <CatalogDetailView v-else-if="route.page === 'catalog-view'" :catalog-key="route.catalogKey" @navigate="navigate" />
     <CatalogEditorView v-else-if="catalogEditRoute" :mode="catalogEditRoute.mode" :catalog-key="catalogEditRoute.catalogKey" @navigate="navigate" />
     <DeviceScanView v-else-if="route.page === 'scan'" @navigate="navigate" />

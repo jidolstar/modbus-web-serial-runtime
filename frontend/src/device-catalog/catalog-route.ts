@@ -4,6 +4,7 @@ export type AppRoute =
   | { readonly page: 'catalog-list'; readonly search?: string }
   | { readonly page: 'catalog-add'; readonly observedBaudRate?: number; readonly observedSlaveId?: number }
   | { readonly page: 'catalog-ai-add' }
+  | { readonly page: 'catalog-ai-edit'; readonly catalogKey: string }
   | { readonly page: 'catalog-view'; readonly catalogKey: string }
   | { readonly page: 'catalog-edit-json'; readonly catalogKey: string }
   | { readonly page: 'catalog-edit-thumbnail'; readonly catalogKey: string }
@@ -53,6 +54,10 @@ export function parseAppRoute(location: Pick<Location, 'pathname' | 'search'> = 
     return route
   }
   if (location.pathname === '/catalogs/ai-add') return { page: 'catalog-ai-add' }
+  if (location.pathname === '/catalogs/ai-edit') {
+    const catalogKey = new URLSearchParams(location.search).get('id') ?? ''
+    return CATALOG_KEY_PATTERN.test(catalogKey) ? { page: 'catalog-ai-edit', catalogKey } : { page: 'catalog-list' }
+  }
   const editPageByPath = { // 수정 책임별 URL을 화면 상태로 변환한다. 예: "/catalogs/edit/files"
     '/catalogs/edit': 'catalog-edit-json',
     '/catalogs/edit/json': 'catalog-edit-json',
@@ -89,6 +94,7 @@ export function routeUrl(route: AppRoute): string {
     return '/catalogs/add'
   }
   if (route.page === 'catalog-ai-add') return '/catalogs/ai-add'
+  if (route.page === 'catalog-ai-edit') return `/catalogs/ai-edit?id=${encodeURIComponent(route.catalogKey)}`
   if (route.page === 'test-device') {
     const parameters = new URLSearchParams({
       name: route.name, catalog: route.catalogKey, revision: String(route.catalogRevision),

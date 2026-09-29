@@ -5,8 +5,8 @@ import { Readable } from 'node:stream'
 import { SameOriginGuard } from '../auth/same-origin.guard'
 import { SessionAuthGuard } from '../auth/session-auth.guard'
 import { CatalogAiApprovalService } from './catalog-ai-approval.service'
-import { CatalogAiApprovalRequestDto, CatalogAiApprovalResponseDto, CatalogAiJobAcceptedDto, CatalogAiJobDto } from './catalog-ai.dto'
-import { AI_MAX_FILES, parseCatalogAiApproval, parseCatalogAiTextInput } from './catalog-ai-input'
+import { CatalogAiApprovalRequestDto, CatalogAiApprovalResponseDto, CatalogAiEditApprovalRequestDto, CatalogAiEditApprovalResponseDto, CatalogAiJobAcceptedDto, CatalogAiJobDto } from './catalog-ai.dto'
+import { AI_MAX_FILES, parseCatalogAiApproval, parseCatalogAiEditApproval, parseCatalogAiTextInput } from './catalog-ai-input'
 import { CatalogAiService, type CatalogAiUpload } from './catalog-ai.service'
 import { CatalogAiSessionService } from './catalog-ai-session.service'
 import { CATALOG_ERROR_CODES } from './catalog.constants'
@@ -24,10 +24,16 @@ function uuid(value: string): string {
   return value
 }
 
+/** AI 수정 URL의 제품 키를 일반 Catalog API와 같은 제한으로 검사한다. */
+function parseCatalogKey(value: string): string {
+  if (!/^[a-z0-9][a-z0-9._-]{0,99}$/.test(value)) throw new CatalogError(CATALOG_ERROR_CODES.aiInvalidInput, 400, ['catalogKey'])
+  return value
+}
+
 /** AI Catalog 생성 job, 상태 조회, 취소와 승인 HTTP 계약을 제공한다. */
 @ApiTags('AI Device Catalogs')
 @ApiCookieAuth('sessionCookie')
-@ApiExtraModels(CatalogAiJobAcceptedDto, CatalogAiJobDto, CatalogAiApprovalRequestDto, CatalogAiApprovalResponseDto, CatalogErrorResponseDto)
+@ApiExtraModels(CatalogAiJobAcceptedDto, CatalogAiJobDto, CatalogAiApprovalRequestDto, CatalogAiApprovalResponseDto, CatalogAiEditApprovalRequestDto, CatalogAiEditApprovalResponseDto, CatalogErrorResponseDto)
 @UseGuards(SessionAuthGuard)
 @Controller('catalogs/ai')
 export class CatalogAiController {
@@ -36,6 +42,17 @@ export class CatalogAiController {
     private readonly approval: CatalogAiApprovalService,
     private readonly sessions: CatalogAiSessionService,
   ) {}
+
+  /** 신규 작성과 AI 수정 multipart가 같은 제한으로 upload를 읽도록 공통 변환한다. */
+  private async multipart(request: FastifyRequest): Promise<{ fields: Record<string, string>; uploads: CatalogAiUpload[] }> {
+    const fields: Record<string, string> = {}
+    const uploads: CatalogAiUpload[] = []
+    for await (const part of request.parts({ limits: { files: AI_MAX_FILES, fields: 5, parts: AI_MAX_FILES + 5 } })) {
+      if (part.type === 'file') uploads.push({ stream: Readable.from(await part.toBuffer()), filename: part.filename, mimetype: part.mimetype })
+      else if (typeof part.value === 'string') fields[part.fieldname] = part.value
+    }
+    return { fields, uploads }
+  }
 
   @Post('jobs')
   @UseGuards(SameOriginGuard)
@@ -50,17 +67,23 @@ export class CatalogAiController {
   @ApiResponse({ status: 503, type: CatalogErrorResponseDto, example: { code: 'CATALOG_AI_NOT_CONFIGURED' } })
   /** multipart 입력을 제한된 text field와 안전 검사 전 upload stream으로 분리해 AI service에 전달한다. */
   async create(@Req() request: FastifyRequest) {
-    const fields: Record<string, string> = {}
-    const uploads: CatalogAiUpload[] = []
-    for await (const part of request.parts({ limits: { files: AI_MAX_FILES, fields: 5, parts: AI_MAX_FILES + 5 } })) {
-      if (part.type === 'file') {
-        const buffer = await part.toBuffer()
-        uploads.push({ stream: Readable.from(buffer), filename: part.filename, mimetype: part.mimetype })
-      } else if (typeof part.value === 'string') {
-        fields[part.fieldname] = part.value
-      }
-    }
+    const { fields, uploads } = await this.multipart(request)
     return this.ai.createJob(parseCatalogAiTextInput(fields), uploads, user(request))
+  }
+
+  @Post('edit/:catalogKey/jobs')
+  @UseGuards(SameOriginGuard)
+  @HttpCode(202)
+  @ApiOperation({ summary: '기존 Catalog AI 수정 작업 시작', description: '현재 Catalog를 서버에서 기준안으로 읽고, 필수 수정 지시와 참고 자료로 전체 JSON 수정안을 생성합니다. 제품 키는 변경할 수 없습니다.' })
+  @ApiParam({ name: 'catalogKey', example: 'example-temperature-sensor' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ schema: { type: 'object', required: ['revisionInstruction'], properties: { revisionInstruction: { type: 'string', minLength: 1, maxLength: 5000, example: '측정값에 소수점 한 자리 형식을 적용해 주세요.' }, referenceUrls: { type: 'string', example: '["https://example.com/manual"]' }, sessionId: { type: 'string', format: 'uuid' }, previousProposal: { type: 'string' }, files: { type: 'array', maxItems: 5, items: { type: 'string', format: 'binary' } } } } })
+  @ApiAcceptedResponse({ type: CatalogAiJobAcceptedDto })
+  @ApiResponse({ status: 400, type: CatalogErrorResponseDto, example: { code: 'CATALOG_AI_INVALID_INPUT', fields: ['revisionInstruction'] } })
+  @ApiResponse({ status: 403, type: CatalogErrorResponseDto, example: { code: 'AUTH_INVALID_ORIGIN' } })
+  async createEdit(@Param('catalogKey') catalogKey: string, @Req() request: FastifyRequest) {
+    const { fields, uploads } = await this.multipart(request)
+    return this.ai.createEditJob(parseCatalogKey(catalogKey), parseCatalogAiTextInput(fields), uploads, user(request))
   }
 
   @Get('jobs/:jobId')
@@ -109,5 +132,17 @@ export class CatalogAiController {
   /** 검토 모달 승인이 호출하며 proposal digest와 선택 자료 소유권을 재확인한 뒤 기존 Catalog 생성 경계를 사용한다. */
   approve(@Param('sessionId') sessionId: string, @Body() body: unknown, @Req() request: FastifyRequest) {
     return this.approval.approve(uuid(sessionId), parseCatalogAiApproval(body), user(request))
+  }
+
+  @Post('edit/:catalogKey/sessions/:sessionId/approve')
+  @UseGuards(SameOriginGuard)
+  @ApiOperation({ summary: 'AI 수정안 승인', description: 'session에 고정된 제품 키와 기준 revision이 일치할 때만 기존 Catalog JSON을 갱신합니다.' })
+  @ApiParam({ name: 'catalogKey', example: 'example-temperature-sensor' })
+  @ApiParam({ name: 'sessionId', format: 'uuid' })
+  @ApiBody({ type: CatalogAiEditApprovalRequestDto })
+  @ApiOkResponse({ type: CatalogAiEditApprovalResponseDto })
+  @ApiResponse({ status: 409, type: CatalogErrorResponseDto, example: { code: 'CATALOG_REVISION_CONFLICT' } })
+  approveEdit(@Param('catalogKey') catalogKey: string, @Param('sessionId') sessionId: string, @Body() body: unknown, @Req() request: FastifyRequest) {
+    return this.approval.approveEdit(parseCatalogKey(catalogKey), uuid(sessionId), parseCatalogAiEditApproval(body), user(request))
   }
 }

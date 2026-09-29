@@ -10,11 +10,12 @@ import { CATALOG_AI_INSTRUCTIONS, CATALOG_AI_PROMPT_VERSION } from './catalog-ai
 import { CatalogAiRequestRepository } from './catalog-ai-request.repository'
 import { CatalogAiSessionService } from './catalog-ai-session.service'
 import type { CatalogAiJob, CatalogAiProposal, CatalogAiSource } from './catalog-ai.types'
-import { assertCatalogAiSource, type CatalogAiTextInput } from './catalog-ai-input'
+import { assertCatalogAiEditInstruction, assertCatalogAiSource, type CatalogAiTextInput } from './catalog-ai-input'
 import { GeminiCatalogClient } from './gemini-catalog.client'
 import { parseCatalogLinkInput } from './catalog-asset-input'
 import { CatalogRepository, type CatalogAiExampleRow } from './catalog.repository'
 import { RecipeSchemaVersion, type CatalogBundle } from '@modbus-manager/device-catalog-domain'
+import { CatalogService } from './catalog.service'
 
 export interface CatalogAiUpload { readonly stream: Readable; readonly filename: string; readonly mimetype: string }
 export interface CatalogAiJobAccepted {
@@ -171,6 +172,7 @@ export class CatalogAiService implements OnModuleInit, OnModuleDestroy {
     private readonly audit: CatalogAiRequestRepository,
     private readonly validator: CatalogValidationService,
     private readonly catalogs: CatalogRepository,
+    private readonly catalogService: CatalogService,
   ) {}
 
   public onModuleInit(): void {
@@ -226,6 +228,28 @@ export class CatalogAiService implements OnModuleInit, OnModuleDestroy {
         mimeType: file.contentType,
       })),
     }
+  }
+
+  /** AI 수정 endpoint가 현재 Catalog를 서버에서 읽어 제품 키와 기준 revision을 고정한 job을 만든다. */
+  public async createEditJob(
+    catalogKey: string,
+    input: CatalogAiTextInput,
+    uploads: readonly CatalogAiUpload[],
+    user: { readonly id: number; readonly email: string },
+  ): Promise<CatalogAiJobAccepted> {
+    assertCatalogAiEditInstruction(input)
+    const catalog = await this.catalogService.get(catalogKey)
+    const baseProposal = {
+      title: catalog.title,
+      definition: catalog.definition,
+      warnings: [], assumptions: [], sources: [],
+      validation: { valid: true, fields: [], issues: [] },
+    }
+    const accepted = await this.createJob({ ...input, previousProposal: input.previousProposal ?? baseProposal }, uploads, user)
+    const job = this.jobs.get(accepted.jobId)
+    if (!job) throw new CatalogError(CATALOG_ERROR_CODES.aiJobNotFound, 404)
+    Object.assign(job, { editTarget: { catalogKey, baseRevision: catalog.revision } })
+    return accepted
   }
 
   /** polling·취소·승인이 호출하며 다른 사용자의 job 존재 여부를 같은 404로 숨긴다. */

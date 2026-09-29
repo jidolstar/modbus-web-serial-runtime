@@ -14,6 +14,24 @@ describe('CatalogAiApiClient', () => {
     expect(new Headers(init?.headers).has('Content-Type')).toBe(false)
   })
 
+  it('starts an edit job with a required instruction and keeps the product key in the URL', async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(json({ jobId: 'job-id', sessionId: 'session-id', status: 'queued', files: [] }, 202))
+    const client = new CatalogAiApiClient('https://api.example.com/api/', request)
+    await client.createEditJob('example-sensor', { revisionInstruction: '표시 형식을 수정해 주세요.', referenceUrls: [], files: [] })
+    expect(request).toHaveBeenCalledWith(new URL('https://api.example.com/api/catalogs/ai/edit/example-sensor/jobs'), expect.objectContaining({ method: 'POST' }))
+    const form = request.mock.calls[0]?.[1]?.body as FormData
+    expect(form.get('revisionInstruction')).toBe('표시 형식을 수정해 주세요.')
+    expect(form.has('catalogKey')).toBe(false)
+  })
+
+  it('approves an edit without allowing a product key in the body', async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(json({ catalogKey: 'example-sensor', revision: 4 }))
+    const client = new CatalogAiApiClient('https://api.example.com/api/', request)
+    await client.approveEdit('example-sensor', 'session-id', { jobId: 'job-id', proposalDigest: 'digest', baseRevision: 3 })
+    const init = request.mock.calls[0]?.[1]
+    expect(JSON.parse(String(init?.body))).toEqual({ jobId: 'job-id', proposalDigest: 'digest', baseRevision: 3 })
+  })
+
   it('does not expose unexpected upstream error fields', async () => {
     const request = vi.fn<typeof fetch>().mockResolvedValue(json({ code: 'CATALOG_AI_UPSTREAM_FAILED', stack: 'private' }, 502))
     const client = new CatalogAiApiClient('https://api.example.com/api/', request)

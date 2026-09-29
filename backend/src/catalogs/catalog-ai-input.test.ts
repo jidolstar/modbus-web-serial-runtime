@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { CatalogError } from './catalog.error'
-import { assertCatalogAiSource, parseCatalogAiApproval, parseCatalogAiTextInput } from './catalog-ai-input'
+import { assertCatalogAiEditInstruction, assertCatalogAiSource, parseCatalogAiApproval, parseCatalogAiEditApproval, parseCatalogAiTextInput } from './catalog-ai-input'
 
 describe('Catalog AI input parsing', () => {
   it('accepts bounded requirements and public HTTPS references', () => {
@@ -26,5 +26,11 @@ describe('Catalog AI input parsing', () => {
   it('keeps approval identifiers limited to the declared fields', () => {
     assert.deepEqual(parseCatalogAiApproval({ jobId: 'job', proposalDigest: 'digest', retainedFileIds: ['file'], retainedUrls: [] }), { jobId: 'job', proposalDigest: 'digest', retainedFileIds: ['file'], retainedUrls: [] })
     assert.throws(() => parseCatalogAiApproval({ jobId: 'job', proposalDigest: 'digest', retainedFileIds: [], retainedUrls: [], ownerId: 1 }), CatalogError)
+  })
+  it('requires a non-empty AI edit instruction and excludes the product key from approval body', () => {
+    assert.throws(() => assertCatalogAiEditInstruction(parseCatalogAiTextInput({ revisionInstruction: '   ' })), CatalogError)
+    assert.doesNotThrow(() => assertCatalogAiEditInstruction(parseCatalogAiTextInput({ revisionInstruction: '출력 형식을 수정해 주세요.' })))
+    assert.deepEqual(parseCatalogAiEditApproval({ jobId: 'job', proposalDigest: 'digest', baseRevision: 3 }), { jobId: 'job', proposalDigest: 'digest', baseRevision: 3 })
+    assert.throws(() => parseCatalogAiEditApproval({ jobId: 'job', proposalDigest: 'digest', baseRevision: 3, catalogKey: 'changed-key' }), CatalogError)
   })
 })

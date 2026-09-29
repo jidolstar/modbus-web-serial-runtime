@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { CatalogAiProposal } from '@modbus-manager/device-catalog-domain'
 import type { CatalogAiFile } from '../../device-catalog/catalog-ai-api'
 import type { CatalogAiRevisionSummary } from '../../device-catalog/catalog-ai-revision'
+import FileDropField from '../../components/FileDropField.vue'
 
 const props = defineProps<{
   readonly proposal: CatalogAiProposal
@@ -10,6 +11,7 @@ const props = defineProps<{
   readonly approving: boolean
   readonly revision: number
   readonly history: readonly CatalogAiRevisionSummary[]
+  readonly editMode?: boolean
 }>()
 const emit = defineEmits<{
   approve: [fileIds: readonly string[], urls: readonly string[]]
@@ -37,8 +39,22 @@ function toggle(set: Set<string>, value: string, checked: boolean): void {
   else set.delete(value)
 }
 
-function chooseReviewFiles(event: Event): void {
-  reviewFiles.value = [...((event.target as HTMLInputElement).files ?? [])]
+/** 재검토 모달의 파일 선택·drop이 호출하며 중복을 제외하고 한 요청당 최대 5개만 유지한다. */
+function chooseReviewFiles(files: readonly File[]): void {
+  const existing = new Set(reviewFiles.value.map((file) => `${file.name}:${file.size}:${file.lastModified}`))
+  const merged = [...reviewFiles.value]
+  for (const file of files) {
+    const identity = `${file.name}:${file.size}:${file.lastModified}`
+    if (!existing.has(identity) && merged.length < 5) {
+      existing.add(identity)
+      merged.push(file)
+    }
+  }
+  reviewFiles.value = merged
+}
+
+function removeReviewFile(index: number): void {
+  reviewFiles.value = reviewFiles.value.filter((_, current) => current !== index)
 }
 
 /** 재검토 버튼이 호출하며 새 자료만 부모에 전달한다. 기존 proposal과 session 자료 결합은 작성 화면이 담당한다. */
@@ -100,14 +116,14 @@ function submitValidationReview(): void {
         <h3>생성된 CatalogBundle JSON</h3>
         <pre class="json-viewer">{{ json }}</pre>
       </section>
-      <section v-if="files.length" class="ai-source-list">
+      <section v-if="files.length && !editMode" class="ai-source-list">
         <h3>Catalog에 보관할 첨부 문서</h3>
         <label v-for="file in files" :key="file.id">
           <input type="checkbox" :checked="selectedFiles.has(file.id)" @change="toggle(selectedFiles, file.id, ($event.target as HTMLInputElement).checked)">
           {{ file.name }} · {{ Math.ceil(file.sizeBytes / 1024) }}KB
         </label>
       </section>
-      <section v-if="proposal.sources.length" class="ai-source-list">
+      <section v-if="proposal.sources.length && !editMode" class="ai-source-list">
         <h3>Catalog에 보관할 참고 링크</h3>
         <label v-for="source in proposal.sources" :key="source.url">
           <input type="checkbox" :checked="selectedUrls.has(source.url)" @change="toggle(selectedUrls, source.url, ($event.target as HTMLInputElement).checked)">
@@ -120,15 +136,25 @@ function submitValidationReview(): void {
         <label for="ai-review-urls">추가 참고 URL <small>한 줄에 하나씩 입력합니다.</small></label>
         <textarea id="ai-review-urls" v-model="reviewUrls" rows="3" placeholder="https://example.com/manual"></textarea>
         <label for="ai-review-files">추가 문서·이미지</label>
-        <input id="ai-review-files" type="file" multiple accept=".pdf,.txt,.md,.json,.doc,.docx,.png,.jpg,.jpeg,.webp" @change="chooseReviewFiles">
+        <FileDropField
+          id="ai-review-files"
+          multiple
+          accept=".pdf,.txt,.md,.json,.doc,.docx,.png,.jpg,.jpeg,.webp"
+          :disabled="approving"
+          prompt="추가 문서나 이미지를 이 영역에 끌어놓거나 파일 선택 버튼을 눌러 주세요."
+          @files="chooseReviewFiles"
+        />
         <ul v-if="reviewFiles.length" class="ai-file-list">
-          <li v-for="file in reviewFiles" :key="`${file.name}-${file.size}`">{{ file.name }} · {{ Math.ceil(file.size / 1024) }}KB</li>
+          <li v-for="(file, index) in reviewFiles" :key="`${file.name}-${file.size}`">
+            <span>{{ file.name }} · {{ Math.ceil(file.size / 1024) }}KB</span>
+            <button type="button" aria-label="추가 파일 제거" @click="removeReviewFile(index)">제거</button>
+          </li>
         </ul>
       </section>
       <footer>
         <button class="button button-ghost" type="button" :disabled="approving" @click="emit('cancel')">작성 취소</button>
         <button class="button button-secondary" type="button" :disabled="approving || !reviewInstruction.trim()" @click="submitReview">재검토</button>
-        <button class="button button-primary" type="button" :disabled="approving || !proposal.validation.valid" @click="emit('approve', [...selectedFiles], [...selectedUrls])">{{ approving ? '등록 중…' : '승인 및 등록' }}</button>
+        <button class="button button-primary" type="button" :disabled="approving || !proposal.validation.valid" @click="emit('approve', [...selectedFiles], [...selectedUrls])">{{ approving ? (editMode ? '적용 중…' : '등록 중…') : (editMode ? 'AI 수정안 적용' : '승인 및 등록') }}</button>
       </footer>
     </article>
   </dialog>
