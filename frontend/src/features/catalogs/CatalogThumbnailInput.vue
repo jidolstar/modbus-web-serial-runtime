@@ -5,7 +5,7 @@ import FileDropField from '../../components/FileDropField.vue'
 import HelpTooltip from '../../components/HelpTooltip.vue'
 import { HELP_TOOLTIP_COPY } from '../../components/help-tooltip-copy'
 
-const props = defineProps<{ readonly catalogKey: string }>()
+const props = defineProps<{ readonly catalogKey: string; readonly hasThumbnail: boolean }>()
 const emit = defineEmits<{ changed: []; error: [message: string] }>()
 const imageUrl = ref<string | null>(null)
 const selectedFile = ref<File | null>(null)
@@ -16,6 +16,10 @@ function replaceUrl(blob: Blob | null): void {
   imageUrl.value = blob ? URL.createObjectURL(blob) : null
 }
 async function load(): Promise<void> {
+  if (!props.hasThumbnail && !selectedFile.value) {
+    replaceUrl(null)
+    return
+  }
   try { replaceUrl(await catalogApi.getThumbnailBlob(props.catalogKey)) } catch { emit('error', '썸네일을 불러오지 못했습니다.') }
 }
 /** 파일 선택과 drag-and-drop이 공통으로 호출하며, 업로드 전 로컬 미리보기만 교체한다. 실제 형식 검증은 Backend가 다시 수행한다. */
@@ -30,7 +34,7 @@ async function upload(): Promise<void> {
   try {
     await catalogApi.replaceThumbnail(props.catalogKey, selectedFile.value)
     selectedFile.value = null
-    await load(); emit('changed')
+    replaceUrl(await catalogApi.getThumbnailBlob(props.catalogKey)); emit('changed')
   } catch { emit('error', 'PNG, JPEG 또는 WebP 이미지를 확인해 주세요.') } finally { busy.value = false }
 }
 onMounted(load)

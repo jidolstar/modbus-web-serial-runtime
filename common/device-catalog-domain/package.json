@@ -15,6 +15,7 @@
     "./schemas/recipe.schema.json": "./schemas/recipe.schema.json",
     "./schemas/catalog-bundle.schema.json": "./schemas/catalog-bundle.schema.json",
     "./schemas/catalog-ai-proposal.schema.json": "./schemas/catalog-ai-proposal.schema.json",
+    "./schemas/catalog-ai-generation-result.schema.json": "./schemas/catalog-ai-generation-result.schema.json",
     "./examples/cwt-th04s.bundle.json": "./examples/cwt-th04s.bundle.json"
   }
 }

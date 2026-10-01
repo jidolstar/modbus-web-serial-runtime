@@ -5,7 +5,7 @@ import { Readable } from 'node:stream'
 import { SameOriginGuard } from '../auth/same-origin.guard'
 import { SessionAuthGuard } from '../auth/session-auth.guard'
 import { CatalogAiApprovalService } from './catalog-ai-approval.service'
-import { CatalogAiApprovalRequestDto, CatalogAiApprovalResponseDto, CatalogAiEditApprovalRequestDto, CatalogAiEditApprovalResponseDto, CatalogAiJobAcceptedDto, CatalogAiJobDto } from './catalog-ai.dto'
+import { CatalogAiApprovalRequestDto, CatalogAiApprovalResponseDto, CatalogAiEditApprovalRequestDto, CatalogAiEditApprovalResponseDto, CatalogAiInsufficientEvidenceDto, CatalogAiJobAcceptedDto, CatalogAiJobDto } from './catalog-ai.dto'
 import { AI_MAX_FILES, parseCatalogAiApproval, parseCatalogAiEditApproval, parseCatalogAiTextInput } from './catalog-ai-input'
 import { CatalogAiService, type CatalogAiUpload } from './catalog-ai.service'
 import { CatalogAiSessionService } from './catalog-ai-session.service'
@@ -33,7 +33,7 @@ function parseCatalogKey(value: string): string {
 /** AI Catalog 생성 job, 상태 조회, 취소와 승인 HTTP 계약을 제공한다. */
 @ApiTags('AI Device Catalogs')
 @ApiCookieAuth('sessionCookie')
-@ApiExtraModels(CatalogAiJobAcceptedDto, CatalogAiJobDto, CatalogAiApprovalRequestDto, CatalogAiApprovalResponseDto, CatalogAiEditApprovalRequestDto, CatalogAiEditApprovalResponseDto, CatalogErrorResponseDto)
+@ApiExtraModels(CatalogAiJobAcceptedDto, CatalogAiJobDto, CatalogAiInsufficientEvidenceDto, CatalogAiApprovalRequestDto, CatalogAiApprovalResponseDto, CatalogAiEditApprovalRequestDto, CatalogAiEditApprovalResponseDto, CatalogErrorResponseDto)
 @UseGuards(SessionAuthGuard)
 @Controller('catalogs/ai')
 export class CatalogAiController {
@@ -87,14 +87,20 @@ export class CatalogAiController {
   }
 
   @Get('jobs/:jobId')
-  @ApiOperation({ summary: 'AI Catalog 작업 상태 조회' })
+  @ApiOperation({ summary: 'AI Catalog 작업 상태 조회', description: '완료 작업은 검토할 proposal과 digest 또는 JSON을 만들 수 없는 근거 부족 사유 중 하나를 반환합니다.' })
   @ApiParam({ name: 'jobId', format: 'uuid' })
   @ApiOkResponse({ type: CatalogAiJobDto })
   @ApiResponse({ status: 404, type: CatalogErrorResponseDto, example: { code: 'CATALOG_AI_JOB_NOT_FOUND' } })
   /** Frontend polling이 호출하며 소유 사용자의 공개 상태와 검토 결과만 반환한다. */
   get(@Param('jobId') jobId: string, @Req() request: FastifyRequest) {
     const job = this.ai.getJob(uuid(jobId), user(request).id)
-    return { status: job.status, proposal: job.proposal, proposalDigest: job.proposalDigest, errorCode: job.errorCode }
+    return {
+      status: job.status,
+      proposal: job.proposal,
+      proposalDigest: job.proposalDigest,
+      insufficientEvidence: job.insufficientEvidence,
+      errorCode: job.errorCode,
+    }
   }
 
   @Delete('jobs/:jobId')
@@ -124,7 +130,7 @@ export class CatalogAiController {
 
   @Post('sessions/:sessionId/approve')
   @UseGuards(SameOriginGuard)
-  @ApiOperation({ summary: 'AI Catalog 제안 승인·등록', description: '완료 proposal을 기존 Catalog 검증 경계로 등록하고 선택한 임시 자료만 Catalog 첨부자료로 승격합니다.' })
+  @ApiOperation({ summary: 'AI Catalog 제안 승인·등록', description: '완료 proposal을 기존 Catalog 검증 경계로 등록하고 선택한 임시 자료만 Catalog 첨부자료로 승격합니다. 근거 부족으로 끝난 작업은 승인할 수 없습니다.' })
   @ApiParam({ name: 'sessionId', format: 'uuid' })
   @ApiBody({ type: CatalogAiApprovalRequestDto })
   @ApiCreatedResponse({ type: CatalogAiApprovalResponseDto })

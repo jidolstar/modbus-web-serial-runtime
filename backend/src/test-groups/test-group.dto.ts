@@ -16,7 +16,7 @@ export class TestGroupNodeWriteDto {
 export class TestGroupWriteDto {
   @ApiProperty({ example: '시험실 A 그룹', maxLength: 100 }) name!: string
   @ApiProperty({ type: TestGroupSerialDto }) serialConfig!: TestGroupSerialDto
-  @ApiProperty({ type: [TestGroupNodeWriteDto], minItems: 1, maxItems: 100 }) nodes!: TestGroupNodeWriteDto[]
+  @ApiProperty({ type: [TestGroupNodeWriteDto], minItems: 1, maxItems: 30, description: '한 RS485 bus에서 순차 측정할 node입니다. 1~30개만 허용합니다.' }) nodes!: TestGroupNodeWriteDto[]
 }
 export class TestGroupUpdateDto extends TestGroupWriteDto { @ApiProperty({ example: 1, minimum: 1 }) revision!: number }
 export class TestGroupNodeDto extends TestGroupNodeWriteDto { @ApiProperty({ example: 31 }) id!: number; @ApiProperty({ example: 0 }) position!: number }

@@ -9,12 +9,12 @@ import { CatalogValidationService } from './catalog-validation.service'
 import { CATALOG_AI_INSTRUCTIONS, CATALOG_AI_PROMPT_VERSION } from './catalog-ai-prompt'
 import { CatalogAiRequestRepository } from './catalog-ai-request.repository'
 import { CatalogAiSessionService } from './catalog-ai-session.service'
-import type { CatalogAiJob, CatalogAiProposal, CatalogAiSource } from './catalog-ai.types'
+import type { CatalogAiInsufficientEvidence, CatalogAiJob, CatalogAiProposal, CatalogAiSource } from './catalog-ai.types'
 import { assertCatalogAiEditInstruction, assertCatalogAiSource, type CatalogAiTextInput } from './catalog-ai-input'
 import { GeminiCatalogClient } from './gemini-catalog.client'
 import { parseCatalogLinkInput } from './catalog-asset-input'
 import { CatalogRepository, type CatalogAiExampleRow } from './catalog.repository'
-import { RecipeSchemaVersion, type CatalogBundle } from '@modbus-manager/device-catalog-domain'
+import { RecipeKind, RecipeSchemaVersion, RecipeStepType, type CatalogAiGenerationResult, type CatalogAiMissingEvidence, type CatalogBundle } from '@modbus-manager/device-catalog-domain'
 import { CatalogService } from './catalog.service'
 
 export interface CatalogAiUpload { readonly stream: Readable; readonly filename: string; readonly mimetype: string }
@@ -30,6 +30,7 @@ const USER_JOB_LIMIT = 10
 const AI_EXAMPLE_CANDIDATE_LIMIT = 20 // DB 전체를 prompt 준비 때문에 읽지 않도록 제한한다.
 const AI_EXAMPLE_MAX_COUNT = 3 // 실제 예시는 형태가 다른 소수만 보내 token 사용량을 제한한다.
 const AI_EXAMPLE_MAX_BYTES = 64 * 1024
+const MISSING_EVIDENCE_VALUES: readonly CatalogAiMissingEvidence[] = ['modbusProtocol', 'readableMeasurement', 'requestedChange']
 
 export interface CatalogAiExample { readonly catalogKey: string; readonly title: string; readonly definition: CatalogBundle }
 
@@ -111,6 +112,7 @@ export function buildCatalogAiPrompt(input: CatalogAiTextInput, examples: readon
     mandatoryContract: {
       recipeSchemaVersion: 'Every recipe must use exactly 2.0',
       outputShape: 'Only v2 output is allowed: source object, decode object, optional transform object, and format object',
+      identifierFormat: 'Application id fields such as profile.id, recipe id, step id, output name, and formatterId must match ^[a-z0-9][a-z0-9._-]*$; never use uppercase or camelCase, and keep all references consistent',
       acceptance: 'The complete definition must satisfy the supplied response schema and all application validation issues before it is returned',
     },
     requirements: input.requirements,
@@ -121,7 +123,7 @@ export function buildCatalogAiPrompt(input: CatalogAiTextInput, examples: readon
       acceptanceCriteria: [
         'Correct every serverValidationIssues entry; none may be ignored or preserved',
         'Return the entire corrected proposal rather than a patch or explanation',
-        'After corrections, re-check recipe IDs, profile references, parameter references, maps, ranges, and every output shape',
+        'After corrections, re-check identifier formats, recipe IDs, profile references, parameter and variable references, maps, ranges, and every output shape',
       ],
     } : null,
     previousProposal: input.previousProposal ?? null,
@@ -154,6 +156,48 @@ export function parseCatalogAiEnvelope(text: string): Omit<CatalogAiProposal, 'v
     }
   }
   return { title: value.title.trim(), definition, warnings, assumptions: value.assumptions, sources }
+}
+
+/**
+ * Gemini 응답 수신 직후 호출해 새 근거 부족 결과만 별도로 해석하고, 기존 proposal은 기존 parser에 그대로 위임한다.
+ * 상세 이유는 Frontend에 표시되므로 개수·길이를 다시 제한하며 예상하지 않은 필드는 공개 결과로 통과시키지 않는다.
+ */
+export function parseCatalogAiGenerationResult(text: string): CatalogAiGenerationResult {
+  let value: unknown
+  try { value = JSON.parse(text) } catch { throw new CatalogError(CATALOG_ERROR_CODES.aiInvalidResponse, 502) }
+  if (!isRecord(value)) throw new CatalogError(CATALOG_ERROR_CODES.aiInvalidResponse, 502)
+  if ('outcome' in value && value.outcome !== 'insufficientEvidence') {
+    throw new CatalogError(CATALOG_ERROR_CODES.aiInvalidResponse, 502)
+  }
+  if (value.outcome !== 'insufficientEvidence') return parseCatalogAiEnvelope(text)
+
+  const allowedKeys = new Set(['outcome', 'missingEvidence', 'reasons'])
+  const missingEvidence = value.missingEvidence
+  const reasons = value.reasons
+  if (Object.keys(value).some((key) => !allowedKeys.has(key))
+    || !Array.isArray(missingEvidence) || missingEvidence.length < 1 || missingEvidence.length > 3
+    || !missingEvidence.every((item): item is CatalogAiMissingEvidence => MISSING_EVIDENCE_VALUES.some((candidate) => candidate === item))
+    || new Set(missingEvidence).size !== missingEvidence.length
+    || !Array.isArray(reasons) || reasons.length < 1 || reasons.length > 5
+    || !reasons.every((item) => typeof item === 'string' && item.trim().length >= 1 && item.length <= 1_000)) {
+    throw new CatalogError(CATALOG_ERROR_CODES.aiInvalidResponse, 502)
+  }
+  return { outcome: 'insufficientEvidence', missingEvidence, reasons: reasons.map((reason) => reason.trim()) }
+}
+
+/** AI 전용 성공 제안이 실제 장비 화면에서 실행할 읽기 Recipe를 하나 이상 제공하는지 확인한다. */
+export function hasUsableCatalogMeasurement(definition: CatalogBundle): boolean {
+  const measurementIds = definition.profile.recipes.measurements ?? []
+  return measurementIds.some((recipeId) => {
+    const recipe = definition.recipes.find(({ id }) => id === recipeId)
+    if (!recipe || recipe.kind !== RecipeKind.Measurement || !recipe.outputs?.length) return false
+    const reads = recipe.steps.filter((step) => step.type === RecipeStepType.ReadHoldingRegisters)
+    return recipe.outputs.some((output) => {
+      if (!('decode' in output)) return false
+      return reads.some((read) => output.source.variable === read.saveAs
+        && output.source.start + output.source.count <= read.count)
+    })
+  })
 }
 
 /** Controller의 생성 요청을 비동기 Gemini 작업으로 실행하고 검증된 proposal 상태를 보관한다. */
@@ -294,11 +338,29 @@ export class CatalogAiService implements OnModuleInit, OnModuleDestroy {
       job.upstreamResponseId = result.responseId
       if (signal.aborted) return
       job.status = 'validating'
-      const parsed = parseCatalogAiEnvelope(result.outputText)
+      const parsed = parseCatalogAiGenerationResult(result.outputText)
+      if ('outcome' in parsed) {
+        job.insufficientEvidence = parsed
+        job.status = 'completed'
+        await this.audit.finish(job.id, { status: 'completed', response: result.raw, upstreamResponseId: result.responseId, inputTokens: result.inputTokens, outputTokens: result.outputTokens, durationMs: Date.now() - startedAt })
+        return
+      }
       const sources = [...parsed.sources]
       for (const url of input.referenceUrls) if (!sources.some((source) => source.url === url)) sources.push({ title: '사용자 참고 URL', url })
       const envelope = { ...parsed, sources }
       const issues = this.validator.inspect(envelope.definition)
+      const validatedDefinition = issues.length === 0 ? this.validator.validate(envelope.definition) : undefined
+      if (validatedDefinition && !hasUsableCatalogMeasurement(validatedDefinition)) {
+        const insufficientEvidence: CatalogAiInsufficientEvidence = {
+          outcome: 'insufficientEvidence',
+          missingEvidence: ['readableMeasurement'],
+          reasons: ['생성된 내용에서 안전하게 실행할 수 있는 데이터 읽기 항목을 확인하지 못했습니다. register 주소, 데이터 형식과 배율이 포함된 자료를 추가해 주세요.'],
+        }
+        job.insufficientEvidence = insufficientEvidence
+        job.status = 'completed'
+        await this.audit.finish(job.id, { status: 'completed', response: result.raw, upstreamResponseId: result.responseId, inputTokens: result.inputTokens, outputTokens: result.outputTokens, durationMs: Date.now() - startedAt })
+        return
+      }
       const fields = [...new Set(issues.map(({ path }) => path))]
       const proposal: CatalogAiProposal = { ...envelope, validation: { valid: issues.length === 0, fields, issues } }
       job.proposal = proposal

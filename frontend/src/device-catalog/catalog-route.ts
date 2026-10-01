@@ -1,7 +1,7 @@
 export type AppRoute =
   | { readonly page: 'dashboard' }
   | { readonly page: 'scan' }
-  | { readonly page: 'catalog-list'; readonly search?: string }
+  | { readonly page: 'catalog-list'; readonly search?: string; readonly listPage?: number }
   | { readonly page: 'catalog-add'; readonly observedBaudRate?: number; readonly observedSlaveId?: number }
   | { readonly page: 'catalog-ai-add' }
   | { readonly page: 'catalog-ai-edit'; readonly catalogKey: string }
@@ -15,6 +15,20 @@ export type AppRoute =
   | { readonly page: 'test-group-add' }
   | { readonly page: 'test-group-edit'; readonly groupId: number }
   | { readonly page: 'test-group-run'; readonly groupId: number }
+
+export interface RoutePresentation {
+  readonly title: string // 상단바의 현재 화면명. 예: "테스트 그룹 실행"
+  readonly context: string // 화면이 속한 업무 영역. 예: "장비 운영"
+  readonly showBack: boolean // true이면 Shell이 안전한 이전 화면 버튼을 표시한다.
+  readonly fallbackRoute?: AppRoute // 직접 URL 진입처럼 앱 내부 이전 이력이 없을 때 이동할 상위 화면이다.
+}
+
+export interface AppHistoryState {
+  readonly owner: 'modbus-manager' // 다른 script가 기록한 history.state와 앱 이력을 구분하는 고정값이다.
+  readonly depth: number // 현재 탭에서 앱이 push한 깊이. 0이면 이전 앱 화면을 보장할 수 없다.
+}
+
+const HISTORY_OWNER = 'modbus-manager'
 
 const CATALOG_KEY_PATTERN = /^[a-z0-9][a-z0-9._-]{0,99}$/ // API URL에 허용되는 Catalog key. 예: "cwt-th04s"
 
@@ -74,8 +88,16 @@ export function parseAppRoute(location: Pick<Location, 'pathname' | 'search'> = 
     return { page: 'catalog-list' }
   }
   if (location.pathname === '/catalogs') {
-    const rawSearch = new URLSearchParams(location.search).get('search')?.trim() ?? ''
-    return rawSearch.length <= 100 && rawSearch ? { page: 'catalog-list', search: rawSearch } : { page: 'catalog-list' }
+    const parameters = new URLSearchParams(location.search)
+    const rawSearch = parameters.get('search')?.trim() ?? ''
+    const rawPage = parameters.get('page')
+    const listPage = rawPage === null ? 1 : Number(rawPage)
+    if (rawSearch.length > 100 || !Number.isSafeInteger(listPage) || listPage < 1) return { page: 'catalog-list' }
+    return {
+      page: 'catalog-list',
+      ...(rawSearch ? { search: rawSearch } : {}),
+      ...(listPage > 1 ? { listPage } : {}),
+    }
   }
   return { page: 'dashboard' }
 }
@@ -88,7 +110,12 @@ export function routeUrl(route: AppRoute): string {
   if (route.page === 'test-group-add') return '/test-groups/add'
   if (route.page === 'test-group-edit') return `/test-groups/${route.groupId}/edit`
   if (route.page === 'test-group-run') return `/test-groups/${route.groupId}/run`
-  if (route.page === 'catalog-list') return route.search?.trim() ? `/catalogs?search=${encodeURIComponent(route.search.trim())}` : '/catalogs'
+  if (route.page === 'catalog-list') {
+    const parameters: string[] = []
+    if (route.search?.trim()) parameters.push(`search=${encodeURIComponent(route.search.trim())}`)
+    if (route.listPage && route.listPage > 1) parameters.push(`page=${route.listPage}`)
+    return parameters.length ? `/catalogs?${parameters.join('&')}` : '/catalogs'
+  }
   if (route.page === 'catalog-add') {
     if (route.observedBaudRate && route.observedSlaveId) return `/catalogs/add?baudRate=${route.observedBaudRate}&slaveId=${route.observedSlaveId}`
     return '/catalogs/add'
@@ -105,4 +132,46 @@ export function routeUrl(route: AppRoute): string {
   if (route.page === 'catalog-view') return `/catalogs/view?id=${encodeURIComponent(route.catalogKey)}`
   const editPath = route.page.replace('catalog-edit-', '')
   return `/catalogs/edit/${editPath}?id=${encodeURIComponent(route.catalogKey)}`
+}
+
+/** AppShell이 route별 제목과 직접 진입 시의 안전한 복귀 위치를 한 계약으로 사용한다. */
+export function routePresentation(route: AppRoute): RoutePresentation {
+  if (route.page === 'dashboard') return { title: '대시보드', context: '장비 운영', showBack: false }
+  if (route.page === 'scan') return { title: '장비 스캔', context: '장비 운영', showBack: false }
+  if (route.page === 'catalog-list') return { title: '장비 카탈로그', context: '장비 운영', showBack: false }
+  if (route.page === 'catalog-view') return { title: '카탈로그 상세', context: '장비 카탈로그', showBack: true, fallbackRoute: { page: 'catalog-list' } }
+  if (route.page === 'catalog-add') return { title: '새 카탈로그', context: '장비 카탈로그', showBack: true, fallbackRoute: { page: 'catalog-list' } }
+  if (route.page === 'catalog-ai-add') return { title: 'AI 카탈로그 작성', context: '장비 카탈로그', showBack: true, fallbackRoute: { page: 'catalog-list' } }
+  if (route.page === 'catalog-ai-edit') return { title: 'AI 카탈로그 수정', context: '장비 카탈로그', showBack: true, fallbackRoute: { page: 'catalog-view', catalogKey: route.catalogKey } }
+  if (route.page === 'catalog-edit-json' || route.page === 'catalog-edit-thumbnail'
+    || route.page === 'catalog-edit-files' || route.page === 'catalog-edit-links') {
+    return { title: '카탈로그 수정', context: '장비 카탈로그', showBack: true, fallbackRoute: { page: 'catalog-view', catalogKey: route.catalogKey } }
+  }
+  if (route.page === 'test-device') {
+    const fallbackRoute: AppRoute = route.origin === 'scan'
+      ? { page: 'scan' }
+      : { page: 'catalog-view', catalogKey: route.catalogKey }
+    return { title: '장비 연결', context: '장비 카탈로그', showBack: true, fallbackRoute }
+  }
+  if (route.page === 'test-group-list') return { title: '테스트 그룹', context: '장비 운영', showBack: false }
+  if (route.page === 'test-group-add') return { title: '새 테스트 그룹', context: '테스트 그룹', showBack: true, fallbackRoute: { page: 'test-group-list' } }
+  if (route.page === 'test-group-edit') return { title: '테스트 그룹 수정', context: '테스트 그룹', showBack: true, fallbackRoute: { page: 'test-group-list' } }
+  return { title: '테스트 그룹 실행', context: '테스트 그룹', showBack: true, fallbackRoute: { page: 'test-group-list' } }
+}
+
+/** 브라우저나 다른 script가 넣은 임의 state를 앱 내부 이력으로 오인하지 않도록 shape와 범위를 검사한다. */
+export function parseAppHistoryState(value: unknown): AppHistoryState | null {
+  if (typeof value !== 'object' || value === null) return null
+  if (!('owner' in value) || !('depth' in value)) return null
+  if (value.owner !== HISTORY_OWNER || !Number.isSafeInteger(value.depth) || Number(value.depth) < 0) return null
+  return { owner: HISTORY_OWNER, depth: Number(value.depth) }
+}
+
+export function nextAppHistoryState(current: unknown): AppHistoryState {
+  const depth = parseAppHistoryState(current)?.depth ?? 0
+  return { owner: HISTORY_OWNER, depth: depth + 1 }
+}
+
+export function initialAppHistoryState(current: unknown): AppHistoryState {
+  return parseAppHistoryState(current) ?? { owner: HISTORY_OWNER, depth: 0 }
 }

@@ -25,10 +25,6 @@ function statusClass(status: CatalogScanStatus): string {
   return status === CatalogScanStatus.Discovered ? 'success' : 'muted'
 }
 
-function registerUnknown(result: CatalogScanResult): void {
-  emit('navigate', { page: 'catalog-add', observedBaudRate: result.serialConfig.baudRate, observedSlaveId: result.slaveId })
-}
-
 /** Scan 결과에서 호출해 활성 Catalog를 불러오고 관찰값이 채워진 생성 모달을 연다. */
 async function createTestDeviceFromScan(result: CatalogScanResult): Promise<void> {
   catalogLoadError.value = null
@@ -94,7 +90,7 @@ function openTestDevice(device: TestDevice): void {
         <div class="scan-result-copy">
           <span>Modbus 응답을 확인했습니다. 사용할 Catalog는 사용자가 직접 지정합니다.</span>
         </div>
-        <div class="inline-actions"><button class="button button-primary button-small" type="button" @click="createTestDeviceFromScan(result)">장비 연결하기</button><button class="button button-ghost button-small" type="button" @click="registerUnknown(result)">새 Catalog 등록</button></div>
+        <div class="inline-actions"><button class="button button-primary button-small" type="button" @click="createTestDeviceFromScan(result)">장비 연결하기</button></div>
       </article>
     </div>
     <p v-else class="empty-copy">아직 스캔 결과가 없습니다.</p>

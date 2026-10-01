@@ -129,6 +129,17 @@ export interface CatalogAiProposalEnvelope {
   readonly sources: ReadonlyArray<CatalogAiSource> // AI가 참고했다고 반환한 출처 후보
 }
 
+/** JSON을 추측하지 않고 사용자에게 추가 자료가 필요한 이유를 안내하는 정상 생성 결과다. */
+export type CatalogAiMissingEvidence = 'modbusProtocol' | 'readableMeasurement' | 'requestedChange'
+export interface CatalogAiInsufficientEvidence {
+  readonly outcome: 'insufficientEvidence'
+  readonly missingEvidence: ReadonlyArray<CatalogAiMissingEvidence> // 부족한 근거 종류. 예: "readableMeasurement"
+  readonly reasons: ReadonlyArray<string> // 사용자가 보완할 자료를 이해하기 위한 제한된 설명
+}
+
+/** 기존 proposal 모양은 유지하고 생성 불가 결과만 추가한 Gemini 원본 응답 계약이다. */
+export type CatalogAiGenerationResult = CatalogAiProposalEnvelope | CatalogAiInsufficientEvidence
+
 /** 기존 CatalogValidationService가 AI definition을 검사한 결과다. Gemini가 직접 작성하지 않는다. */
 export interface CatalogAiValidation {
   readonly valid: boolean // true이면 현재 proposal을 승인 endpoint로 보낼 수 있음

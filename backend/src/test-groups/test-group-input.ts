@@ -2,7 +2,8 @@ import { SerialFlowControl, SerialParity, type SerialConfig } from '@modbus-mana
 import { TestGroupError } from './test-group.error'
 
 const MAX_NAME_LENGTH = 100
-const MAX_NODES = 100
+/** 한 RS485 bus에서 순차 측정할 수 있는 node의 공개 API 상한이다. */
+export const MAX_TEST_GROUP_NODES = 30
 const CATALOG_KEY_PATTERN = /^[a-z0-9][a-z0-9._-]{0,99}$/
 
 export interface TestGroupNodeInput { readonly name: string; readonly catalogKey: string; readonly catalogRevision: number; readonly slaveId: number }
@@ -37,7 +38,7 @@ export function parseTestGroupInput(value: unknown, requireRevision: boolean): T
     || !['none', 'even', 'odd'].includes(String(serial.parity)) || !['none', 'hardware'].includes(String(serial.flowControl))) {
     throw new TestGroupError('TEST_GROUP_INVALID_INPUT', 400, ['/serialConfig'])
   }
-  if (!Array.isArray(body.nodes) || body.nodes.length < 1 || body.nodes.length > MAX_NODES) throw new TestGroupError('TEST_GROUP_INVALID_INPUT', 400, ['/nodes'])
+  if (!Array.isArray(body.nodes) || body.nodes.length < 1 || body.nodes.length > MAX_TEST_GROUP_NODES) throw new TestGroupError('TEST_GROUP_INVALID_INPUT', 400, ['/nodes'])
   const nodes = body.nodes.map((candidate, index) => {
     const node = record(candidate); const path = `/nodes/${index}`
     if (!node) throw new TestGroupError('TEST_GROUP_INVALID_INPUT', 400, [path])

@@ -41,8 +41,10 @@ function publicError(error: unknown): string {
 async function load(): Promise<void> {
   loading.value = true; notice.value = null
   try {
-    const [catalog, fileItems, linkItems, thumbnail] = await Promise.all([
-      catalogApi.get(props.catalogKey), catalogApi.listFiles(props.catalogKey), catalogApi.listLinks(props.catalogKey), catalogApi.getThumbnailBlob(props.catalogKey),
+    const catalog = await catalogApi.get(props.catalogKey)
+    const [fileItems, linkItems, thumbnail] = await Promise.all([
+      catalogApi.listFiles(props.catalogKey), catalogApi.listLinks(props.catalogKey),
+      catalog.hasThumbnail ? catalogApi.getThumbnailBlob(props.catalogKey) : Promise.resolve(null),
     ])
     detail.value = catalog; files.value = fileItems; links.value = linkItems
     if (thumbnail) thumbnailUrl.value = URL.createObjectURL(thumbnail)
@@ -63,7 +65,7 @@ onBeforeUnmount(() => { if (thumbnailUrl.value) URL.revokeObjectURL(thumbnailUrl
 
 <template>
   <header class="page-heading detail-page-heading">
-    <div><button class="text-link" type="button" @click="emit('navigate', { page: 'catalog-list' })">← 목록으로</button><p class="eyebrow">CATALOG DETAIL</p><h1>{{ detail?.title ?? '카탈로그 상세' }}</h1><p v-if="detail" class="description">{{ detail.manufacturer }} · {{ detail.model }}</p></div>
+    <div><p class="eyebrow">CATALOG DETAIL</p><h1>{{ detail?.title ?? '카탈로그 상세' }}</h1><p v-if="detail" class="description">{{ detail.manufacturer }} · {{ detail.model }}</p></div>
     <div v-if="detail" class="page-heading-actions"><button class="button button-primary" type="button" :disabled="!detail.enabled" @click="testDeviceModalOpen = true">장비 연결하기</button></div>
   </header>
   <p v-if="notice" class="notice error">{{ notice }}</p>

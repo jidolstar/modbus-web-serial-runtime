@@ -11,6 +11,7 @@ export interface CatalogSummary {
   readonly revision: number // 낙관적 잠금 번호. 예: 3
   readonly enabled: boolean // true이면 Runtime snapshot에 포함됨
   readonly usesExtensions: boolean // capability adapter 선언 포함 여부
+  readonly hasThumbnail: boolean // true이면 thumbnail 조회 endpoint에 저장된 이미지가 있음
   readonly createdAt: string // UTC ISO 8601 생성 시각
   readonly updatedAt: string // UTC ISO 8601 수정 시각
 }
@@ -43,7 +44,7 @@ function parseSummary(value: unknown): CatalogSummary {
     || typeof value.catalogKey !== 'string' || typeof value.title !== 'string'
     || typeof value.manufacturer !== 'string' || typeof value.model !== 'string'
     || typeof value.schemaVersion !== 'string' || !Number.isInteger(value.revision)
-    || typeof value.enabled !== 'boolean' || typeof value.usesExtensions !== 'boolean'
+    || typeof value.enabled !== 'boolean' || typeof value.usesExtensions !== 'boolean' || typeof value.hasThumbnail !== 'boolean'
     || typeof value.createdAt !== 'string' || typeof value.updatedAt !== 'string') {
     throw new CatalogApiError(502, 'INVALID_RESPONSE')
   }
@@ -86,8 +87,13 @@ export class CatalogApiClient {
     return new URL(path.replace(/^\//, ''), this.apiBaseUrl).toString()
   }
 
-  public async list(query = ''): Promise<{ readonly items: CatalogSummary[]; readonly total: number }> {
-    const parameters = new URLSearchParams({ limit: '100', offset: '0' })
+  /** 관리 목록과 선택 화면에서 필요한 범위만 요청한다. limit은 API 허용 범위인 1~100 안에서 전달한다. */
+  public async list(query = '', limit = 100, offset = 0): Promise<{ readonly items: CatalogSummary[]; readonly total: number }> {
+    if (query.trim().length > 100 || !Number.isSafeInteger(limit) || limit < 1 || limit > 100
+      || !Number.isSafeInteger(offset) || offset < 0) {
+      throw new CatalogApiError(400, 'INVALID_LIST_QUERY')
+    }
+    const parameters = new URLSearchParams({ limit: String(limit), offset: String(offset) })
     if (query.trim()) parameters.set('q', query.trim())
     const value = await this.json(`${MANAGEMENT_PATH}?${parameters}`)
     if (!isRecord(value) || !Array.isArray(value.items) || !Number.isInteger(value.total)) throw new CatalogApiError(502, 'INVALID_RESPONSE')

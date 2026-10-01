@@ -7,6 +7,7 @@ const emit = defineEmits<{ connect: []; view: [] }>()
 const thumbnailUrl = ref<string | null>(null)
 
 onMounted(async () => {
+  if (!props.catalog.hasThumbnail) return
   try {
     const blob = await catalogApi.getThumbnailBlob(props.catalog.catalogKey)
     if (blob) thumbnailUrl.value = URL.createObjectURL(blob)

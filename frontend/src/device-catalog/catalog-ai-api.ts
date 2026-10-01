@@ -1,8 +1,8 @@
-import type { CatalogAiProposal, CatalogAiSource } from '@modbus-manager/device-catalog-domain'
+import type { CatalogAiInsufficientEvidence, CatalogAiMissingEvidence, CatalogAiProposal, CatalogAiSource } from '@modbus-manager/device-catalog-domain'
 import { parseApiBaseUrl } from '../http/api-base-url'
 import { CatalogApiError } from './catalog-api'
 
-export type { CatalogAiProposal, CatalogAiSource }
+export type { CatalogAiInsufficientEvidence, CatalogAiMissingEvidence, CatalogAiProposal, CatalogAiSource }
 
 export interface CatalogAiFile {
   readonly id: string // AI session 안에서 파일 선택·승격에 사용하는 임의 ID
@@ -22,6 +22,7 @@ export interface CatalogAiJobState {
   readonly status: 'queued' | 'generating' | 'validating' | 'completed' | 'failed' | 'cancelled'
   readonly proposal?: CatalogAiProposal
   readonly proposalDigest?: string // 승인 시 서버가 원본 proposal과 같은지 확인하는 SHA-256 digest
+  readonly insufficientEvidence?: CatalogAiInsufficientEvidence // JSON 없이 자료 보완이 필요한 정상 완료 결과
   readonly errorCode?: string // Backend가 허용한 안정 오류 code만 전달됨
 }
 
@@ -60,6 +61,23 @@ function isCatalogAiProposal(value: unknown): value is CatalogAiProposal {
     && isStringArray(value.validation.fields)
     && Array.isArray(value.validation.issues)
     && value.validation.issues.every(isValidationIssue)
+}
+
+const MISSING_EVIDENCE_VALUES: readonly CatalogAiMissingEvidence[] = ['modbusProtocol', 'readableMeasurement', 'requestedChange']
+
+function isCatalogAiInsufficientEvidence(value: unknown): value is CatalogAiInsufficientEvidence {
+  return isRecord(value)
+    && Object.keys(value).every((key) => ['outcome', 'missingEvidence', 'reasons'].includes(key))
+    && value.outcome === 'insufficientEvidence'
+    && Array.isArray(value.missingEvidence)
+    && value.missingEvidence.length >= 1
+    && value.missingEvidence.length <= 3
+    && value.missingEvidence.every((item) => MISSING_EVIDENCE_VALUES.some((candidate) => candidate === item))
+    && new Set(value.missingEvidence).size === value.missingEvidence.length
+    && Array.isArray(value.reasons)
+    && value.reasons.length >= 1
+    && value.reasons.length <= 5
+    && value.reasons.every((item) => typeof item === 'string' && item.trim().length >= 1 && item.length <= 1_000)
 }
 
 const CATALOG_AI_JOB_STATUSES = ['queued', 'generating', 'validating', 'completed', 'failed', 'cancelled'] as const
@@ -145,6 +163,9 @@ export class CatalogAiApiClient {
       || !isCatalogAiJobStatus(value.status)
       || (value.proposal !== undefined && !isCatalogAiProposal(value.proposal))
       || (value.proposalDigest !== undefined && typeof value.proposalDigest !== 'string')
+      || (value.insufficientEvidence !== undefined && !isCatalogAiInsufficientEvidence(value.insufficientEvidence))
+      || (value.insufficientEvidence !== undefined && value.status !== 'completed')
+      || (value.insufficientEvidence !== undefined && (value.proposal !== undefined || value.proposalDigest !== undefined))
       || (value.errorCode !== undefined && typeof value.errorCode !== 'string')) {
       throw new CatalogApiError(502, 'INVALID_RESPONSE')
     }
@@ -152,6 +173,7 @@ export class CatalogAiApiClient {
       status: value.status,
       proposal: value.proposal,
       proposalDigest: value.proposalDigest,
+      insufficientEvidence: value.insufficientEvidence,
       errorCode: value.errorCode,
     }
   }

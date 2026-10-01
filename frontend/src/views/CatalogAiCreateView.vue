@@ -5,12 +5,13 @@ import { catalogApi, CatalogApiError } from '../device-catalog/catalog-api'
 import FileDropField from '../components/FileDropField.vue'
 import CatalogAiReviewDialog from '../features/catalogs/CatalogAiReviewDialog.vue'
 import CatalogAiCancelDialog from '../features/catalogs/CatalogAiCancelDialog.vue'
-import { catalogAiApi, type CatalogAiFile, type CatalogAiProposal } from '../device-catalog/catalog-ai-api'
+import CatalogAiInsufficientDialog from '../features/catalogs/CatalogAiInsufficientDialog.vue'
+import { catalogAiApi, type CatalogAiFile, type CatalogAiInsufficientEvidence, type CatalogAiProposal } from '../device-catalog/catalog-ai-api'
 import { appendCatalogAiRevision, type CatalogAiRevisionSummary } from '../device-catalog/catalog-ai-revision'
 
 type CatalogAiPhase = 'editing' | 'uploading' | 'queued' | 'generating' | 'validating' | 'reviewing' | 'approving'
 
-const emit = defineEmits<{ navigate: [route: AppRoute] }>()
+const emit = defineEmits<{ back: []; navigate: [route: AppRoute] }>()
 const props = defineProps<{
   readonly mode: 'create' | 'edit' // Dashboard route가 화면 목적을 명시해 선택적 key 유무로 작성·수정을 추론하지 않는다.
   readonly catalogKey?: string
@@ -25,6 +26,7 @@ const sessionId = ref<string>()
 const jobId = ref<string>()
 const proposal = ref<CatalogAiProposal>()
 const proposalDigest = ref<string>()
+const insufficientEvidence = ref<CatalogAiInsufficientEvidence>()
 const revisionHistory = ref<readonly CatalogAiRevisionSummary[]>([])
 const phase = ref<CatalogAiPhase>('editing')
 const notice = ref<string>()
@@ -59,8 +61,10 @@ async function loadEditSources(): Promise<void> {
     return
   }
   try {
-    const [detail, files, links, thumbnail] = await Promise.all([
-      catalogApi.get(props.catalogKey), catalogApi.listFiles(props.catalogKey), catalogApi.listLinks(props.catalogKey), catalogApi.getThumbnailBlob(props.catalogKey),
+    const detail = await catalogApi.get(props.catalogKey)
+    const [files, links, thumbnail] = await Promise.all([
+      catalogApi.listFiles(props.catalogKey), catalogApi.listLinks(props.catalogKey),
+      detail.hasThumbnail ? catalogApi.getThumbnailBlob(props.catalogKey) : Promise.resolve(null),
     ])
     baseRevision.value = detail.revision
     catalogTitle.value = detail.title
@@ -162,6 +166,7 @@ async function generate(
   suspendedProposal = { proposal: previousProposal, digest: previousDigest }
   proposal.value = undefined
   proposalDigest.value = undefined
+  insufficientEvidence.value = undefined
   phase.value = 'uploading'
   startElapsed()
 
@@ -204,6 +209,14 @@ async function generate(
         revisionHistory.value = appendCatalogAiRevision(revisionHistory.value, revisionInstruction, state.proposal)
         suspendedProposal = undefined
         phase.value = 'reviewing'
+        stopElapsed()
+        return
+      }
+      if (state.status === 'completed' && state.insufficientEvidence) {
+        // 근거 부족은 장애가 아니며, 직전 proposal을 복원하면 요청하지 않은 이전안을 실수로 승인할 수 있다.
+        insufficientEvidence.value = state.insufficientEvidence
+        suspendedProposal = undefined
+        phase.value = 'editing'
         stopElapsed()
         return
       }
@@ -274,6 +287,7 @@ function clearDraftState(): void {
   uploadedFiles.value = []
   proposal.value = undefined
   proposalDigest.value = undefined
+  insufficientEvidence.value = undefined
   suspendedProposal = undefined
   revisionHistory.value = []
   sessionId.value = undefined
@@ -281,43 +295,44 @@ function clearDraftState(): void {
 }
 
 /**
- * 상단 목록 이동에서 호출한다. 서버 session이 생기기 전의 입력만 있다면 정리할 자원이 없어 바로 이동한다.
+ * AppShell의 back 버튼에서 호출한다. 서버 session이 생기기 전의 입력만 있다면 정리할 자원이 없어 바로 이동한다.
  * session 또는 생성 결과가 있으면 실수로 Gemini 파일과 검토 결과를 버리지 않도록 확인 dialog를 연다.
  */
 function leaveForCatalogList(): void {
   if (!sessionId.value && !proposal.value && !busy.value) {
     clearDraftState()
-    emit('navigate', props.catalogKey ? { page: 'catalog-view', catalogKey: props.catalogKey } : { page: 'catalog-list' })
+    emit('back')
     return
   }
   requestDiscard()
 }
 
 /**
- * 사용자가 취소를 확정하면 job, local 임시 파일과 Gemini 파일을 정리한 뒤 목록으로 이동한다.
- * session 정리에 실패하면 감사 DB는 건드리지 않고 현재 입력과 화면을 유지해 재시도할 수 있게 한다.
+ * 사용자가 취소를 확정하면 검토 상태를 즉시 닫고 목록으로 이동한다.
+ * job·session 정리는 화면 전환과 분리한 best-effort 작업이며, 실패한 임시 자료는 Backend TTL이 최종 정리한다.
  */
-async function discardDraft(): Promise<void> {
+function discardDraft(): void {
   discarding.value = true
   notice.value = undefined
   generationToken += 1
-  try {
-    if (jobId.value && busy.value) await catalogAiApi.cancel(jobId.value).catch(() => undefined)
-    if (sessionId.value) await catalogAiApi.discardSession(sessionId.value)
-    // 서버 자원 정리가 끝난 시점에 modal을 먼저 제거하고, 그 다음 비동기 상위 navigation을 요청한다.
-    clearDraftState()
-    emit('navigate', props.catalogKey ? { page: 'catalog-view', catalogKey: props.catalogKey } : { page: 'catalog-list' })
-  } catch (error) {
-    confirmingDiscard.value = false
-    proposal.value = suspendedProposal?.proposal ?? proposal.value
-    proposalDigest.value = suspendedProposal?.digest ?? proposalDigest.value
-    suspendedProposal = undefined
-    phase.value = proposal.value ? 'reviewing' : 'editing'
-    notice.value = message(error)
-  } finally {
-    discarding.value = false
+
+  const cleanupRequests: Promise<void>[] = []
+  if (jobId.value && busy.value) {
+    cleanupRequests.push(catalogAiApi.cancel(jobId.value).catch(() => undefined))
   }
+  if (sessionId.value) {
+    cleanupRequests.push(catalogAiApi.discardSession(sessionId.value).catch(() => undefined))
+  }
+
+  // 네트워크 정리를 기다리지 않아 실패·지연 중에도 native dialog가 화면에 남지 않는다.
+  clearDraftState()
+  discarding.value = false
+  emit('back')
+  void Promise.all(cleanupRequests)
 }
+
+// Dashboard가 상단bar back을 눌렀을 때 이 화면의 폐기 확인 절차를 우회하지 않도록 좁은 API만 공개한다.
+defineExpose({ requestLeave: leaveForCatalogList })
 
 /**
  * sidebar 등 외부 navigation으로 component가 사라질 때 서버 자원을 best-effort로 정리한다.
@@ -334,7 +349,6 @@ onMounted(loadEditSources)
 </script>
 
 <template>
-  <button class="text-link" type="button" @click="leaveForCatalogList">← {{ isEdit ? '상세로' : '목록으로' }}</button>
   <header class="page-heading">
     <div>
       <p class="eyebrow">{{ isEdit ? 'AI CATALOG EDITOR' : 'AI CATALOG BUILDER' }}</p>
@@ -370,6 +384,13 @@ onMounted(loadEditSources)
             <button type="button" aria-label="선택 파일 제거" @click="removePendingFile(index)">제거</button>
           </li>
         </ul>
+        <div v-if="uploadedFiles.length" class="ai-uploaded-files">
+          <strong>업로드된 자료</strong>
+          <small>같은 작성 세션에서 다시 요청할 때 재사용합니다.</small>
+          <ul class="ai-file-list">
+            <li v-for="file in uploadedFiles" :key="file.id">{{ file.name }} · {{ Math.ceil(file.sizeBytes / 1024) }}KB</li>
+          </ul>
+        </div>
       </div>
       <figure v-if="isEdit && thumbnailPreviewUrl" class="ai-thumbnail-preview">
         <figcaption>현재 제품 썸네일</figcaption>
@@ -404,5 +425,10 @@ onMounted(loadEditSources)
     :discarding="discarding"
     @continue="confirmingDiscard = false"
     @discard="discardDraft"
+  />
+  <CatalogAiInsufficientDialog
+    v-if="insufficientEvidence"
+    :result="insufficientEvidence"
+    @confirm="insufficientEvidence = undefined"
   />
 </template>

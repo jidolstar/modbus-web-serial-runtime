@@ -7,9 +7,10 @@ import catalogBundleSchema = require('@modbus-manager/device-catalog-domain/sche
 import deviceProfileSchema = require('@modbus-manager/device-catalog-domain/schemas/device-profile.schema.json')
 import recipeSchema = require('@modbus-manager/device-catalog-domain/schemas/recipe.schema.json')
 import catalogBundle = require('@modbus-manager/device-catalog-domain/examples/cwt-th04s.bundle.json')
-import { buildCatalogAiPrompt, parseCatalogAiEnvelope } from './catalog-ai.service'
+import { buildCatalogAiPrompt, hasUsableCatalogMeasurement, parseCatalogAiEnvelope, parseCatalogAiGenerationResult } from './catalog-ai.service'
 import { CatalogError } from './catalog.error'
 import { CATALOG_AI_INSTRUCTIONS, CATALOG_AI_OUTPUT_SCHEMA, CATALOG_AI_PROMPT_VERSION } from './catalog-ai-prompt'
+import { CatalogValidationService } from './catalog-validation.service'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -38,16 +39,65 @@ describe('Catalog AI response parsing', () => {
   })
 
   it('binds the structured output definition to the CatalogBundle schema', () => {
-    const properties = CATALOG_AI_OUTPUT_SCHEMA.properties
     const definitions = CATALOG_AI_OUTPUT_SCHEMA.$defs
-    assert.equal(isRecord(properties), true)
-    assert.deepEqual(isRecord(properties) ? properties.definition : undefined, { $ref: '#/$defs/catalogBundle' })
-    assert.equal(isRecord(properties) && 'definitionJson' in properties, false)
+    const proposal = isRecord(definitions) && isRecord(definitions.catalogAiProposal) ? definitions.catalogAiProposal : undefined
+    const properties = proposal && isRecord(proposal.properties) ? proposal.properties : undefined
+    assert.deepEqual(properties?.definition, { $ref: '#/$defs/catalogBundle' })
+    assert.equal(properties && 'definitionJson' in properties, false)
     assert.equal(isRecord(definitions) && JSON.stringify(definitions.catalogBundle).includes('"additionalProperties":false'), true)
     const recipe = isRecord(definitions) && isRecord(definitions.recipe) ? definitions.recipe : undefined
     const recipeProperties = recipe && isRecord(recipe.properties) ? recipe.properties : undefined
     assert.deepEqual(recipeProperties?.schemaVersion, { enum: ['2.0'] })
     assert.deepEqual(recipeProperties?.outputs, { type: 'array', items: { $ref: '#/$defs/recipe-outputV2' } })
+  })
+
+  it('keeps the existing proposal shape and accepts a separate insufficient-evidence result', () => {
+    const validate = new Ajv({ allErrors: true, strict: false }).compile(CATALOG_AI_OUTPUT_SCHEMA)
+    const proposal = {
+      title: 'Example temperature sensor',
+      definition: { ...catalogBundle, recipes: catalogBundle.recipes.map((recipe) => ({ ...recipe, schemaVersion: '2.0' })) },
+      warnings: [], assumptions: [], sources: [],
+    }
+    const insufficient = {
+      outcome: 'insufficientEvidence',
+      missingEvidence: ['modbusProtocol', 'readableMeasurement'],
+      reasons: ['제공된 자료에서 Modbus register 표를 찾지 못했습니다.'],
+    }
+
+    assert.equal(validate(proposal), true)
+    assert.equal(validate(insufficient), true)
+    assert.equal(validate({ ...insufficient, definition: {} }), false)
+    assert.deepEqual(parseCatalogAiGenerationResult(JSON.stringify(proposal)), proposal)
+    assert.deepEqual(parseCatalogAiGenerationResult(JSON.stringify(insufficient)), insufficient)
+  })
+
+  it('rejects malformed insufficient-evidence details at the server boundary', () => {
+    assert.throws(
+      () => parseCatalogAiGenerationResult(JSON.stringify({
+        outcome: 'insufficientEvidence',
+        missingEvidence: ['unknown'],
+        reasons: ['자료가 부족합니다.'],
+      })),
+      CatalogError,
+    )
+    assert.throws(
+      () => parseCatalogAiGenerationResult(JSON.stringify({
+        outcome: 'proposal',
+        title: 'Unexpected wrapper', definition: {}, warnings: [], assumptions: [], sources: [],
+      })),
+      CatalogError,
+    )
+  })
+
+  it('requires at least one referenced measurement with a bounded read output', () => {
+    const validator = new CatalogValidationService()
+    const validBundle = validator.validate(catalogBundle)
+    const withoutMeasurements = validator.validate({
+      ...validBundle,
+      profile: { ...validBundle.profile, recipes: { ...validBundle.profile.recipes, measurements: [] } },
+    })
+    assert.equal(hasUsableCatalogMeasurement(validBundle), true)
+    assert.equal(hasUsableCatalogMeasurement(withoutMeasurements), false)
   })
 
   it('accepts only Recipe 2.0 and v2 outputs in the Gemini response contract', () => {
@@ -85,7 +135,7 @@ describe('Catalog AI response parsing', () => {
   })
 
   it('keeps generic protocol names out of generated identity fields', () => {
-    assert.equal(CATALOG_AI_PROMPT_VERSION, '2026-09-29.5')
+    assert.equal(CATALOG_AI_PROMPT_VERSION, '2026-09-30.2')
     assert.match(CATALOG_AI_INSTRUCTIONS, /Do not include generic transport or protocol terms/)
     assert.match(CATALOG_AI_INSTRUCTIONS, /set profile\.manufacturer to exactly "Unknown"/)
     assert.match(CATALOG_AI_INSTRUCTIONS, /do not use "Generic"/)
@@ -93,6 +143,12 @@ describe('Catalog AI response parsing', () => {
     assert.match(CATALOG_AI_INSTRUCTIONS, /serverValidationIssues are authoritative/)
     assert.match(CATALOG_AI_INSTRUCTIONS, /Every Recipe schemaVersion must be exactly 2\.0/)
     assert.match(CATALOG_AI_INSTRUCTIONS, /Never emit legacy decoder/)
+    assert.match(CATALOG_AI_INSTRUCTIONS, /If Modbus is not evidenced/)
+    assert.match(CATALOG_AI_INSTRUCTIONS, /Never treat validCatalogExamples as evidence/)
+    assert.match(CATALOG_AI_INSTRUCTIONS, /briefly in Korean/)
+    assert.match(CATALOG_AI_INSTRUCTIONS, /must match \^\[a-z0-9\]/)
+    assert.match(CATALOG_AI_INSTRUCTIONS, /never use uppercase or camelCase/)
+    assert.match(CATALOG_AI_INSTRUCTIONS, /parameter name, saveAs, and output source\.variable follow their separate variable-name contract/)
   })
 
   it('turns server validation issues into mandatory revision acceptance criteria', () => {
@@ -111,5 +167,7 @@ describe('Catalog AI response parsing', () => {
     assert.equal(revision.serverValidationIssues.length, 1)
     assert.equal(revision.acceptanceCriteria.length, 3)
     assert.match(JSON.stringify(prompt.mandatoryContract), /Only v2 output is allowed/)
+    assert.match(JSON.stringify(prompt.mandatoryContract), /never use uppercase or camelCase/)
+    assert.match(revision.acceptanceCriteria[2] ?? '', /identifier formats/)
   })
 })

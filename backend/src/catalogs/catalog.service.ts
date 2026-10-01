@@ -3,7 +3,7 @@ import type { CatalogBundle } from '@modbus-manager/device-catalog-domain'
 import { CATALOG_ERROR_CODES } from './catalog.constants'
 import { CatalogError } from './catalog.error'
 import type { CatalogListQuery, CatalogStatusInput, CatalogUpdateInput, CatalogWriteInput } from './catalog-input'
-import { CatalogRepository, type CatalogDefinitionValues, type CatalogRow } from './catalog.repository'
+import { CatalogRepository, type CatalogDefinitionValues, type CatalogWithThumbnailRow } from './catalog.repository'
 import { CatalogValidationService } from './catalog-validation.service'
 
 export interface CatalogSummary {
@@ -15,6 +15,7 @@ export interface CatalogSummary {
   readonly revision: number // 낙관적 잠금 번호. 예: 2
   readonly enabled: boolean // 실행 후보 활성 상태. 예: true
   readonly usesExtensions: boolean // TypeScript adapter capability 사용 여부. 예: false
+  readonly hasThumbnail: boolean // true이면 thumbnail GET이 200 응답 가능한 metadata를 보유함
   readonly createdAt: string // ISO 8601 생성 시각. 예: "2026-09-23T00:00:00.000Z"
   readonly updatedAt: string // ISO 8601 수정 시각. 예: "2026-09-23T01:00:00.000Z"
 }
@@ -112,7 +113,7 @@ export class CatalogService {
     }
   }
 
-  private toSummary(row: CatalogRow): CatalogSummary {
+  private toSummary(row: CatalogWithThumbnailRow): CatalogSummary {
     const definition = this.parseStoredDefinition(row.definition_json)
     return {
       catalogKey: row.catalog_key,
@@ -123,12 +124,13 @@ export class CatalogService {
       revision: row.revision,
       enabled: Boolean(row.enabled),
       usesExtensions: (definition.profile.extensions?.length ?? 0) > 0,
+      hasThumbnail: Boolean(row.has_thumbnail),
       createdAt: row.created_at.toISOString(),
       updatedAt: row.updated_at.toISOString(),
     }
   }
 
-  private toDetail(row: CatalogRow): CatalogDetail {
+  private toDetail(row: CatalogWithThumbnailRow): CatalogDetail {
     return { ...this.toSummary(row), definition: this.parseStoredDefinition(row.definition_json) }
   }
 
@@ -136,7 +138,7 @@ export class CatalogService {
     return this.validator.validate(typeof value === 'string' ? JSON.parse(value) : value)
   }
 
-  private async requireCatalog(catalogKey: string): Promise<CatalogRow> {
+  private async requireCatalog(catalogKey: string): Promise<CatalogWithThumbnailRow> {
     const row = await this.repository.findByKey(catalogKey)
     if (!row) throw new CatalogError(CATALOG_ERROR_CODES.notFound, 404)
     return row

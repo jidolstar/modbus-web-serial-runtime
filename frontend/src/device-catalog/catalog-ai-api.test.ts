@@ -71,6 +71,56 @@ describe('CatalogAiApiClient', () => {
     })
   })
 
+  it('accepts an insufficient-evidence completion without a proposal', async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(json({
+      status: 'completed',
+      insufficientEvidence: {
+        outcome: 'insufficientEvidence',
+        missingEvidence: ['readableMeasurement'],
+        reasons: ['register 주소와 데이터 형식이 포함된 자료를 찾지 못했습니다.'],
+      },
+    }))
+    const client = new CatalogAiApiClient('https://api.example.com/api/', request)
+
+    await expect(client.getJob('job-id')).resolves.toMatchObject({
+      status: 'completed',
+      insufficientEvidence: { missingEvidence: ['readableMeasurement'] },
+    })
+  })
+
+  it('rejects a completion that mixes a proposal with insufficient evidence', async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(json({
+      status: 'completed',
+      proposal: {
+        title: 'Example sensor', definition: {}, warnings: [], assumptions: [], sources: [],
+        validation: { valid: true, fields: [], issues: [] },
+      },
+      proposalDigest: 'digest',
+      insufficientEvidence: {
+        outcome: 'insufficientEvidence',
+        missingEvidence: ['readableMeasurement'],
+        reasons: ['자료가 부족합니다.'],
+      },
+    }))
+    const client = new CatalogAiApiClient('https://api.example.com/api/', request)
+
+    await expect(client.getJob('job-id')).rejects.toMatchObject({ status: 502, code: 'INVALID_RESPONSE' })
+  })
+
+  it('rejects insufficient evidence before the job is completed', async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(json({
+      status: 'generating',
+      insufficientEvidence: {
+        outcome: 'insufficientEvidence',
+        missingEvidence: ['modbusProtocol'],
+        reasons: ['Modbus 자료가 없습니다.'],
+      },
+    }))
+    const client = new CatalogAiApiClient('https://api.example.com/api/', request)
+
+    await expect(client.getJob('job-id')).rejects.toMatchObject({ status: 502, code: 'INVALID_RESPONSE' })
+  })
+
   it('discards the temporary AI session without sending a request body', async () => {
     const request = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 204 }))
     const client = new CatalogAiApiClient('https://api.example.com/api/', request)

@@ -94,6 +94,27 @@ describe('CatalogValidationService', () => {
     assert.throws(() => validator.validate(invalidBundle), CatalogError)
   })
 
+  it('v2 output의 camelCase 이름은 lowercase 규칙만 안내하고 legacy branch 오류는 숨긴다', () => {
+    const invalidBundle = cloneJson(catalogBundle) as unknown as {
+      recipes: Array<{ outputs?: Array<{ name: string }> }>
+    }
+    invalidBundle.recipes[0].outputs![0].name = 'co2Calibration'
+
+    assert.deepEqual(validator.inspect(invalidBundle), [{
+      path: '/recipes/0/outputs/0/name',
+      message: '영문 소문자 또는 숫자로 시작하고 영문 소문자, 숫자, 점(.), 밑줄(_), 하이픈(-)만 사용할 수 있습니다.',
+    }])
+  })
+
+  it('v2 output 이름을 lowercase id로 바꾸면 검증을 통과한다', () => {
+    const validBundle = cloneJson(catalogBundle) as unknown as {
+      recipes: Array<{ outputs?: Array<{ name: string }> }>
+    }
+    validBundle.recipes[0].outputs![0].name = 'co2-calibration'
+
+    assert.equal(validator.validate(validBundle).recipes[0].outputs?.[0]?.name, 'co2-calibration')
+  })
+
   it('문자열 decoder에 숫자 transform을 선언한 v2 output을 거부한다', () => {
     const invalidBundle = cloneJson(catalogBundle) as unknown as { recipes: Array<{ outputs?: Array<Record<string, unknown>> }> }
     invalidBundle.recipes[0].outputs![0].decode = { type: 'ascii' }

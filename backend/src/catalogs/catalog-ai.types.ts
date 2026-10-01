@@ -1,8 +1,8 @@
-import type { CatalogAiProposal, CatalogAiSource } from '@modbus-manager/device-catalog-domain'
+import type { CatalogAiInsufficientEvidence, CatalogAiProposal, CatalogAiSource } from '@modbus-manager/device-catalog-domain'
 
 export type CatalogAiJobStatus = 'queued' | 'generating' | 'validating' | 'completed' | 'failed' | 'cancelled'
 
-export type { CatalogAiProposal, CatalogAiSource }
+export type { CatalogAiInsufficientEvidence, CatalogAiProposal, CatalogAiSource }
 export interface GeminiSessionFileReference {
   readonly name: string // Gemini Files API의 삭제·상태 조회 식별자. 예: "files/example-id"
   readonly uri: string // GenerateContent fileData가 참조하는 provider URI
@@ -29,5 +29,6 @@ export interface CatalogAiJob {
   upstreamResponseId?: string
   proposal?: CatalogAiProposal
   proposalDigest?: string
+  insufficientEvidence?: CatalogAiInsufficientEvidence // 자료 보완 뒤 재요청할 수 있는 정상 완료 결과이며 승인 대상은 아니다.
   errorCode?: string
 }

@@ -40,6 +40,7 @@ describe('Swagger integration', { skip: !runIntegrationTests }, () => {
     }
     assert.match(document, /"sessionCookie"/)
     assert.match(document, /"examples"/)
+    assert.match(document, /"hasThumbnail"/)
 
     for (const secret of [
       config.auth.jwtSecret,

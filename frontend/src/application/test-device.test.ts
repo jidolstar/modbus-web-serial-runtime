@@ -5,7 +5,7 @@ import { checkTestDeviceCatalogCompatibility, createTestDevice } from './test-de
 
 const CATALOG = {
   catalogKey: 'cwt-th04s', title: 'CWT 온습도 센서', manufacturer: 'CWT', model: 'CWT-TH04S',
-  schemaVersion: '1.0', revision: 3, enabled: true, usesExtensions: false,
+  schemaVersion: '1.0', revision: 3, enabled: true, usesExtensions: false, hasThumbnail: false,
   createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', definition: cwtBundle,
 } as CatalogDetail
 

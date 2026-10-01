@@ -7,8 +7,15 @@ const props = withDefaults(defineProps<{
   readonly user: AuthUser
   readonly isLoggingOut: boolean
   readonly activeSection?: 'dashboard' | 'catalogs' | 'scan' | 'test-groups'
-}>(), { activeSection: 'dashboard' })
-const emit = defineEmits<{ logout: []; navigate: [section: 'dashboard' | 'catalogs' | 'scan' | 'test-groups'] }>()
+  readonly pageTitle: string
+  readonly pageContext: string
+  readonly showBack?: boolean
+}>(), { activeSection: 'dashboard', showBack: false })
+const emit = defineEmits<{
+  back: []
+  logout: []
+  navigate: [section: 'dashboard' | 'catalogs' | 'scan' | 'test-groups']
+}>()
 
 const isNavigationOpen = ref(false)
 const userInitial = computed(() => (props.user.displayName || props.user.email).trim().charAt(0).toUpperCase())
@@ -41,18 +48,23 @@ onBeforeUnmount(() => {
         <button class="navigation-item" :class="{ active: activeSection === 'test-groups' }" type="button" :aria-current="activeSection === 'test-groups' ? 'page' : undefined" @click="navigate('test-groups')"><span class="navigation-icon" aria-hidden="true">✓</span>테스트 그룹</button>
       </nav>
       <div class="sidebar-footer">
-        <span class="environment-indicator"><i /> 시스템 온라인</span>
-        <span>Web Serial 기반 장비 관리</span>
+        <div class="sidebar-account">
+          <span class="avatar" aria-hidden="true">{{ userInitial }}</span>
+          <span class="user-copy" :title="user.email"><strong>{{ user.displayName || '관리자' }}</strong><small>{{ user.email }}</small></span>
+          <button class="sidebar-logout" type="button" :disabled="isLoggingOut" @click="$emit('logout')">
+            <span aria-hidden="true">↪</span>{{ isLoggingOut ? '처리 중…' : '로그아웃' }}
+          </button>
+        </div>
       </div>
     </aside>
     <div class="app-workspace">
       <header class="topbar">
         <button class="menu-button icon-button" type="button" aria-label="메뉴 열기" aria-controls="primary-navigation" :aria-expanded="isNavigationOpen" @click="isNavigationOpen = !isNavigationOpen"><span aria-hidden="true">☰</span></button>
-        <div class="topbar-context"><span>장비 운영</span><strong>{{ activeSection === 'catalogs' ? '장비 카탈로그' : activeSection === 'scan' ? '장비 스캔' : activeSection === 'test-groups' ? '테스트 그룹' : '대시보드' }}</strong></div>
-        <div class="user-menu">
-          <span class="avatar" aria-hidden="true">{{ userInitial }}</span>
-          <span class="user-copy"><strong>{{ user.displayName || '관리자' }}</strong><small>{{ user.email }}</small></span>
-          <button class="button button-ghost button-compact" type="button" :disabled="isLoggingOut" @click="$emit('logout')">{{ isLoggingOut ? '처리 중…' : '로그아웃' }}</button>
+        <div class="topbar-navigation">
+          <button v-if="showBack" class="topbar-back" type="button" aria-label="이전 화면으로" @click="$emit('back')">
+            <span aria-hidden="true">‹</span>
+          </button>
+          <div class="topbar-context"><strong>{{ pageTitle }}</strong><span>{{ pageContext }}</span></div>
         </div>
       </header>
       <main id="dashboard" class="app-content"><slot /></main>

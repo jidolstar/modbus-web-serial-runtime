@@ -19,6 +19,51 @@ function pointerSegment(value: string): string {
   return value.replaceAll('~', '~0').replaceAll('/', '~1')
 }
 
+const LOWERCASE_ID_PATTERN = '^[a-z0-9][a-z0-9._-]*$'
+const RECIPE_OUTPUT_PATH = /^\/recipes\/(\d+)\/outputs\/(\d+)$/
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/**
+ * AI가 만든 v2 output 하나의 오류에 legacy branch 진단이 섞였는지 판별한다.
+ * 공용 Schema의 legacy 호환은 유지하고, 사용자에게 공개할 오류 목록에서만 관계없는 branch 오류를 제거한다.
+ */
+function isLegacyBranchErrorForV2Output(error: ErrorObject, candidate: unknown): boolean {
+  const outputPath = error.instancePath.match(RECIPE_OUTPUT_PATH)?.[0]
+    ?? error.instancePath.replace(/\/(name|source)(?:\/.*)?$/, '')
+  const indexes = outputPath.match(RECIPE_OUTPUT_PATH)
+  if (!indexes || !isRecord(candidate) || !Array.isArray(candidate.recipes)) return false
+  const recipe = candidate.recipes[Number(indexes[1])]
+  if (!isRecord(recipe) || !Array.isArray(recipe.outputs)) return false
+  const output = recipe.outputs[Number(indexes[2])]
+  if (!isRecord(output) || !isRecord(output.source) || !isRecord(output.decode)) return false
+
+  if (error.instancePath === outputPath && error.keyword === 'required') {
+    return error.params.missingProperty === 'decoder'
+  }
+  if (error.instancePath === outputPath && error.keyword === 'additionalProperties') {
+    return ['decode', 'transform', 'format'].includes(String(error.params.additionalProperty))
+  }
+  return error.instancePath === `${outputPath}/source`
+    && error.keyword === 'type'
+    && error.params.type === 'string'
+}
+
+/** 구체적인 v2 하위 오류가 있으면 같은 output의 포괄적인 oneOf 오류는 중복 안내하지 않는다. */
+function isRedundantOutputOneOfError(error: ErrorObject, errors: readonly ErrorObject[]): boolean {
+  if (error.keyword !== 'oneOf' || !RECIPE_OUTPUT_PATH.test(error.instancePath)) return false
+  return errors.some((candidate) => candidate !== error
+    && (candidate.instancePath === error.instancePath || candidate.instancePath.startsWith(`${error.instancePath}/`))
+    && candidate.keyword !== 'oneOf')
+}
+
+function relevantSchemaErrors(errors: readonly ErrorObject[], candidate: unknown): readonly ErrorObject[] {
+  const withoutWrongBranch = errors.filter((error) => !isLegacyBranchErrorForV2Output(error, candidate))
+  return withoutWrongBranch.filter((error) => !isRedundantOutputOneOfError(error, withoutWrongBranch))
+}
+
 /** AJV 내부 문구를 값이나 Schema 구현을 노출하지 않는 사용자용 검증 설명으로 바꾼다. */
 function formatSchemaIssue(error: ErrorObject): { readonly path: string; readonly message: string } {
   if (error.keyword === 'required' && typeof error.params.missingProperty === 'string') {
@@ -35,6 +80,12 @@ function formatSchemaIssue(error: ErrorObject): { readonly path: string; readonl
   }
   if (error.keyword === 'type' && typeof error.params.type === 'string') {
     return { path: formatSchemaPath(error), message: `값의 형식이 '${error.params.type}'이어야 합니다.` }
+  }
+  if (error.keyword === 'pattern' && error.params.pattern === LOWERCASE_ID_PATTERN) {
+    return {
+      path: formatSchemaPath(error),
+      message: '영문 소문자 또는 숫자로 시작하고 영문 소문자, 숫자, 점(.), 밑줄(_), 하이픈(-)만 사용할 수 있습니다.',
+    }
   }
   return { path: formatSchemaPath(error), message: 'CatalogBundle JSON 계약에 맞지 않는 값입니다.' }
 }
@@ -61,7 +112,8 @@ export class CatalogValidationService {
   /** AI 검토 화면이 호출하며, 공개 가능한 경로와 해결 단서를 최대 20개까지 반환한다. */
   public inspect(candidate: unknown): readonly { readonly path: string; readonly message: string }[] {
     if (!this.#validateBundle(candidate)) {
-      return uniqueIssues((this.#validateBundle.errors ?? []).map(formatSchemaIssue)).slice(0, 20)
+      const errors = relevantSchemaErrors(this.#validateBundle.errors ?? [], candidate)
+      return uniqueIssues(errors.map(formatSchemaIssue)).slice(0, 20)
     }
 
     const issues = [...validateCatalogBundleReferences(candidate)]

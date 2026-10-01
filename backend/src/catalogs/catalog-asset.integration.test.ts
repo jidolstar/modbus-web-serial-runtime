@@ -32,13 +32,18 @@ describe('Catalog asset API integration', { skip: !runDatabaseTests }, () => {
       const created = await fetch(`http://127.0.0.1:${config.port}/api/catalogs`, {
         method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'Asset Test Sensor', definition }),
       })
-      assert.equal(created.status, 201, await created.text())
+      const createdText = await created.text()
+      assert.equal(created.status, 201, createdText)
+      assert.equal((JSON.parse(createdText) as { hasThumbnail: boolean }).hasThumbnail, false)
 
       const thumbnailForm = new FormData()
       const thumbnailBytes = await sharp({ create: { width: 20, height: 10, channels: 3, background: '#2563eb' } }).png().toBuffer()
       thumbnailForm.append('file', new Blob([thumbnailBytes], { type: 'image/png' }), 'sensor.png')
       const thumbnail = await fetch(`${baseUrl}/thumbnail`, { method: 'PUT', headers, body: thumbnailForm })
       assert.equal(thumbnail.status, 200, await thumbnail.text())
+      const detailAfterThumbnail = await fetch(baseUrl, { headers: { Cookie: headers.Cookie } })
+      assert.equal(detailAfterThumbnail.status, 200)
+      assert.equal((await detailAfterThumbnail.json() as { hasThumbnail: boolean }).hasThumbnail, true)
       const thumbnailResponse = await fetch(`${baseUrl}/thumbnail`, { headers: { Cookie: headers.Cookie } })
       assert.equal(thumbnailResponse.status, 200)
       assert.equal(thumbnailResponse.headers.get('content-type'), 'image/jpeg')

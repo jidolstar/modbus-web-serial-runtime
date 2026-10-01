@@ -6,6 +6,9 @@ import { CatalogsTable, DatabaseSchema } from '../database/database.types'
 import type { CatalogListQuery } from './catalog-input'
 
 export type CatalogRow = Selectable<CatalogsTable>
+export type CatalogWithThumbnailRow = CatalogRow & {
+  readonly has_thumbnail: boolean | number // EXISTS 결과. 썸네일 metadata row가 있으면 true 또는 1
+}
 
 export interface CatalogDefinitionValues {
   readonly catalogKey: string // Profile에서 추출한 DB unique key. 예: "cwt-th04s"
@@ -30,7 +33,7 @@ export class CatalogRepository {
   public constructor(@Inject(DATABASE) private readonly database: Kysely<DatabaseSchema>) {}
 
   /** 등록 API에서 검증 완료된 Bundle과 사용자 ID를 하나의 row로 저장한다. */
-  public async create(values: CatalogDefinitionValues, userId: number): Promise<CatalogRow> {
+  public async create(values: CatalogDefinitionValues, userId: number): Promise<CatalogWithThumbnailRow> {
     const result = await this.database.insertInto('catalog').values({
       catalog_key: values.catalogKey,
       title: values.title,
@@ -42,12 +45,14 @@ export class CatalogRepository {
       created_by_user_id: userId,
       updated_by_user_id: userId,
     }).executeTakeFirstOrThrow()
-    return this.findById(Number(result.insertId)) as Promise<CatalogRow>
+    const created = await this.findById(Number(result.insertId))
+    if (!created) throw new Error('Created Catalog could not be loaded')
+    return created
   }
 
   /** 목록 API에서 검색·상태 조건을 적용하고 전체 개수와 현재 page를 함께 반환한다. */
-  public async list(query: CatalogListQuery): Promise<{ readonly rows: CatalogRow[]; readonly total: number }> {
-    let rowsQuery = this.database.selectFrom('catalog').selectAll()
+  public async list(query: CatalogListQuery): Promise<{ readonly rows: CatalogWithThumbnailRow[]; readonly total: number }> {
+    let rowsQuery = this.catalogsWithThumbnail()
     let countQuery = this.database.selectFrom('catalog').select(({ fn }) => fn.countAll().as('total'))
     if (query.enabled !== undefined) {
       rowsQuery = rowsQuery.where('enabled', '=', query.enabled)
@@ -76,8 +81,8 @@ export class CatalogRepository {
   }
 
   /** 상세·수정 API가 안정 key로 현재 row를 조회할 때 사용한다. */
-  public findByKey(catalogKey: string): Promise<CatalogRow | undefined> {
-    return this.database.selectFrom('catalog').selectAll().where('catalog_key', '=', catalogKey).executeTakeFirst()
+  public findByKey(catalogKey: string): Promise<CatalogWithThumbnailRow | undefined> {
+    return this.catalogsWithThumbnail().where('catalog_key', '=', catalogKey).executeTakeFirst()
   }
 
   /** Runtime snapshot API가 활성 정의만 안정 key 순서로 읽어 재현 가능한 응답을 만들 때 사용한다. */
@@ -95,8 +100,17 @@ export class CatalogRepository {
       .execute()
   }
 
-  private findById(id: number): Promise<CatalogRow | undefined> {
-    return this.database.selectFrom('catalog').selectAll().where('id', '=', id).executeTakeFirst()
+  private findById(id: number): Promise<CatalogWithThumbnailRow | undefined> {
+    return this.catalogsWithThumbnail().where('id', '=', id).executeTakeFirst()
+  }
+
+  /** 목록·상세가 별도 thumbnail GET 없이 존재 여부를 판단하도록 같은 DB 조회에 EXISTS 값을 붙인다. */
+  private catalogsWithThumbnail() {
+    return this.database.selectFrom('catalog').selectAll().select((expression) => expression.exists(
+      expression.selectFrom('catalog_thumbnails')
+        .select('catalog_thumbnails.catalog_id')
+        .whereRef('catalog_thumbnails.catalog_id', '=', 'catalog.id'),
+    ).as('has_thumbnail'))
   }
 
   /** 수정 API에서 key와 revision이 모두 일치할 때만 전체 정의를 교체한다. */

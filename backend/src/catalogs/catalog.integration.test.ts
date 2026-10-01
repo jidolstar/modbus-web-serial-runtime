@@ -44,13 +44,16 @@ describe('Catalog API integration', { skip: !runDatabaseTests }, () => {
       })
       const createdText = await created.text()
       assert.equal(created.status, 201, createdText)
-      const createdBody = JSON.parse(createdText) as { catalogKey: string; revision: number }
+      const createdBody = JSON.parse(createdText) as { catalogKey: string; revision: number; hasThumbnail: boolean }
       assert.equal(createdBody.catalogKey, catalogKey)
       assert.equal(createdBody.revision, 1)
+      assert.equal(createdBody.hasThumbnail, false)
 
       const list = await fetch(`${baseUrl}?q=${encodeURIComponent(catalogKey)}`, { headers: authenticatedHeaders })
       assert.equal(list.status, 200)
-      assert.equal((await list.json() as { total: number }).total, 1)
+      const listBody = await list.json() as { total: number; items: Array<{ hasThumbnail: boolean }> }
+      assert.equal(listBody.total, 1)
+      assert.equal(listBody.items[0]?.hasThumbnail, false)
 
       const updateBody = JSON.stringify({ title: 'Updated Integration Sensor', definition, revision: 1 })
       const updated = await fetch(`${baseUrl}/${catalogKey}`, {

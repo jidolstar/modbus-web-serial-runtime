@@ -8,7 +8,8 @@ import CatalogCard from '../features/catalogs/CatalogCard.vue'
 import TestDeviceFormModal from '../features/test-device/TestDeviceFormModal.vue'
 
 const emit = defineEmits<{ navigate: [route: AppRoute] }>()
-const props = withDefaults(defineProps<{ readonly search?: string }>(), { search: '' })
+const props = withDefaults(defineProps<{ readonly search?: string; readonly page?: number }>(), { search: '', page: 1 })
+const PAGE_SIZE = 10 // 관리 목록 한 page에 표시할 Catalog 수. 예: 23개이면 3 page
 const catalogs = ref<CatalogSummary[]>([])
 const total = ref(0)
 const query = ref(props.search)
@@ -17,6 +18,7 @@ const listFailed = ref(false)
 const notice = ref<string | null>(null)
 const connectionCatalog = ref<CatalogDetail | null>(null)
 const canReset = computed(() => Boolean(query.value.trim() || props.search))
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
 
 function publicError(error: unknown): string {
   if (error instanceof CatalogApiError && error.status === 401) return '로그인 세션이 만료되었습니다. 페이지를 새로고침해 주세요.'
@@ -27,8 +29,11 @@ function publicError(error: unknown): string {
 async function loadCatalogs(retryTransient = true): Promise<void> {
   loading.value = true; notice.value = null
   try {
-    const result = await catalogApi.list(query.value)
+    const result = await catalogApi.list(query.value, PAGE_SIZE, (props.page - 1) * PAGE_SIZE)
     catalogs.value = result.items; total.value = result.total; listFailed.value = false
+    if (result.total > 0 && props.page > totalPages.value) {
+      emit('navigate', { page: 'catalog-list', ...(props.search ? { search: props.search } : {}), listPage: totalPages.value })
+    }
   } catch (error) {
     const transient = !(error instanceof CatalogApiError) || error.status === 0 || error.status >= 500
     if (retryTransient && transient) {
@@ -42,12 +47,18 @@ async function loadCatalogs(retryTransient = true): Promise<void> {
 function submitSearch(): void {
   const search = query.value.trim()
   emit('navigate', search ? { page: 'catalog-list', search } : { page: 'catalog-list' })
-  if (search === props.search) void loadCatalogs()
+  if (search === props.search && props.page === 1) void loadCatalogs()
 }
 function resetSearch(): void {
   if (!canReset.value) return
   query.value = ''
   emit('navigate', { page: 'catalog-list' })
+}
+
+/** 페이지 버튼에서 검색 조건은 유지하고 URL의 page만 바꿔 뒤로가기 상태도 보존한다. */
+function movePage(page: number): void {
+  if (loading.value || page < 1 || page > totalPages.value || page === props.page) return
+  emit('navigate', { page: 'catalog-list', ...(props.search ? { search: props.search } : {}), ...(page > 1 ? { listPage: page } : {}) })
 }
 
 /** 목록 카드의 연결 버튼에서 실행 정의 전체를 불러온 뒤 공용 연결 설정 모달을 연다. */
@@ -68,7 +79,7 @@ function openTestDevice(device: TestDevice): void {
 }
 
 onMounted(loadCatalogs)
-watch(() => props.search, (search) => { query.value = search; void loadCatalogs() })
+watch(() => [props.search, props.page] as const, ([search]) => { query.value = search; void loadCatalogs() })
 </script>
 
 <template>
@@ -86,5 +97,10 @@ watch(() => props.search, (search) => { query.value = search; void loadCatalogs(
   </section>
   <p v-else-if="!loading && !listFailed" class="empty-panel surface-card">검색 조건에 맞는 카탈로그가 없습니다.</p>
   <p v-else-if="listFailed" class="empty-panel surface-card">목록을 불러오지 못했습니다. 다시 시도해 주세요.</p>
+  <nav v-if="!loading && !listFailed" class="catalog-pagination" aria-label="카탈로그 페이지">
+    <button class="button button-ghost button-small" type="button" :disabled="loading || page <= 1" @click="movePage(page - 1)">이전</button>
+    <span><strong>{{ page }}</strong> / {{ totalPages }} 페이지</span>
+    <button class="button button-ghost button-small" type="button" :disabled="loading || page >= totalPages" @click="movePage(page + 1)">다음</button>
+  </nav>
   <TestDeviceFormModal v-if="connectionCatalog" :open="true" :catalogs="[connectionCatalog]" :initial-catalog-key="connectionCatalog.catalogKey" :prepare-connection="() => testBusSession.requestPort()" catalog-locked origin="catalog" @cancel="connectionCatalog = null" @save="openTestDevice" />
 </template>

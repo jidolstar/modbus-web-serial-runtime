@@ -12,10 +12,16 @@ export class CatalogAiJobAcceptedDto {
   @ApiProperty({ example: 'queued' }) status!: string
   @ApiProperty({ type: [CatalogAiSessionFileDto] }) files!: CatalogAiSessionFileDto[]
 }
+export class CatalogAiInsufficientEvidenceDto {
+  @ApiProperty({ enum: ['insufficientEvidence'], example: 'insufficientEvidence' }) outcome!: 'insufficientEvidence'
+  @ApiProperty({ enum: ['modbusProtocol', 'readableMeasurement', 'requestedChange'], isArray: true, example: ['readableMeasurement'], description: 'JSON을 안전하게 만들기 위해 부족한 근거 종류' }) missingEvidence!: string[]
+  @ApiProperty({ type: [String], maxItems: 5, example: ['register 주소와 데이터 형식이 포함된 Modbus 자료를 찾지 못했습니다.'] }) reasons!: string[]
+}
 export class CatalogAiJobDto {
   @ApiProperty({ example: 'completed' }) status!: string
   @ApiPropertyOptional({ type: 'object', additionalProperties: true, description: 'AI 제안과 서버 검증 결과입니다. validation.issues에는 공개 JSON 경로와 사용자용 원인이 포함됩니다.' }) proposal?: object
   @ApiPropertyOptional({ example: '73f1070f052dd86bb0105ad14a3b938d7316a73e48aa819873455b67d52da8e5' }) proposalDigest?: string
+  @ApiPropertyOptional({ type: CatalogAiInsufficientEvidenceDto, description: '자료를 보완해 다시 요청해야 하는 정상 완료 결과입니다. 이 결과에는 proposal과 digest가 없습니다.' }) insufficientEvidence?: CatalogAiInsufficientEvidenceDto
   @ApiPropertyOptional({ example: 'CATALOG_AI_UPSTREAM_TIMEOUT' }) errorCode?: string
 }
 export class CatalogAiApprovalRequestDto {

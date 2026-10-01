@@ -54,6 +54,7 @@ export class CatalogSummaryDto {
   @ApiProperty({ example: 2 }) revision!: number // 수정 충돌 검사용 번호
   @ApiProperty({ example: true }) enabled!: boolean // 실행 후보 포함 상태
   @ApiProperty({ example: false }) usesExtensions!: boolean // adapter capability 포함 여부
+  @ApiProperty({ example: true, description: 'true일 때만 thumbnail 조회 endpoint를 호출하면 됩니다.' }) hasThumbnail!: boolean // 썸네일 metadata 존재 여부
   @ApiProperty({ example: '2026-09-23T00:00:00.000Z', format: 'date-time' }) createdAt!: string // 생성 시각
   @ApiProperty({ example: '2026-09-23T01:00:00.000Z', format: 'date-time' }) updatedAt!: string // 수정 시각
 }
