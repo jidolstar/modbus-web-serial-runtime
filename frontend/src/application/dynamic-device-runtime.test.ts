@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import profileJson from '../../public/device-catalog/cwt-th04s/profile.json'
+import profileJson from '../test-fixtures/device-catalog/cwt-th04s/profile.json'
 import type { DeviceCatalog } from '../device-catalog/catalog.types'
 import type { DeviceProfile, DeviceProfileSummary } from '../device-catalog/device-profile.types'
 import { DeviceProfileValidator } from '../device-catalog/device-profile-validator'

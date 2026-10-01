@@ -113,9 +113,14 @@ onBeforeUnmount(() => { window.removeEventListener('popstate', handlePopState); 
   >
     <template v-if="route.page === 'dashboard'">
       <header class="page-heading">
-      <div><p class="eyebrow">MODBUS DEVICE TOOL</p><h1>RS485 Modbus RTU 장비를 브라우저에서 관리하세요</h1><p class="description">브라우저에서 USB Serial을 통해 RS485 Modbus RTU 장비를 탐색하고, 테스트하고, 설정하는 도구입니다.</p></div>
-      <span class="page-date">브라우저 로컬 실행</span>
+      <div><p class="eyebrow">MODBUS STUDIO</p><h1>장비 정의부터 실행까지, 브라우저에서</h1><p class="description">Catalog의 Profile과 Recipe로 동작을 정의하고, Web Serial로 RS485 Modbus RTU 장비를 탐색·측정·설정하세요.</p></div>
+      <span class="page-date">USB Serial · 브라우저 실행</span>
       </header>
+      <ol class="dashboard-flow" aria-label="장비 작업 흐름">
+      <li><span>01</span><div><strong>정의</strong><small>Catalog · Profile · Recipe</small></div></li>
+      <li><span>02</span><div><strong>탐색과 연결</strong><small>브라우저에서 Modbus Scan</small></div></li>
+      <li><span>03</span><div><strong>실행과 확인</strong><small>측정 · 테스트 · 지원 설정</small></div></li>
+      </ol>
       <section class="summary-grid" aria-label="주요 기능">
       <article class="summary-card"><span class="summary-icon blue" aria-hidden="true"><ScanIcon /></span><div><span>장비 탐색</span><strong>Modbus Scan</strong><small>USB Serial에 연결된 RS485 장비를 찾습니다.</small></div></article>
       <article class="summary-card"><span class="summary-icon green" aria-hidden="true">◉</span><div><span>장비 테스트</span><strong>Catalog 기반 실행</strong><small>장비별 Recipe로 측정과 동작을 확인합니다.</small></div></article>

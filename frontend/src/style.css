@@ -162,11 +162,24 @@ dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 14px; f
 dt { color: var(--brand-600); font-weight: 800; }
 dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 
-.auth-card { width: min(480px, calc(100vw - 32px)); margin: clamp(32px, 10vh, 96px) auto; padding: clamp(28px, 6vw, 44px); border: 1px solid var(--slate-200); border-radius: 14px; background: white; box-shadow: 0 20px 50px rgb(15 23 42 / 9%); }
-.auth-card::before { display: grid; width: 42px; height: 42px; margin-bottom: 24px; place-items: center; border-radius: 10px; color: white; background: var(--brand-600); content: 'M'; font-weight: 800; }
-.auth-card h1 { margin: 7px 0 10px; color: var(--slate-900); font-size: clamp(1.65rem, 6vw, 2.25rem); letter-spacing: -.04em; line-height: 1.25; }
+.auth-page { display: grid; width: min(1040px, calc(100vw - 40px)); min-height: min(680px, calc(100vh - 64px)); grid-template-columns: minmax(0, 1.1fr) minmax(300px, .9fr); align-items: center; gap: clamp(36px, 7vw, 84px); margin: 32px auto; }
+.auth-intro { min-width: 0; }
+.auth-intro > .eyebrow { margin-bottom: 12px; }
+.auth-intro h1 { margin: 0; color: var(--slate-900); font-size: clamp(2.5rem, 6vw, 4.4rem); letter-spacing: -.055em; line-height: 1.08; }
+.auth-tagline { max-width: 540px; margin: 18px 0 30px; color: var(--slate-600); font-size: clamp(1rem, 2vw, 1.22rem); line-height: 1.65; }
+.auth-flow, .dashboard-flow { display: grid; margin: 0; padding: 0; list-style: none; }
+.auth-flow { gap: 10px; }
+.auth-flow li, .dashboard-flow li { display: flex; min-width: 0; align-items: center; gap: 13px; }
+.auth-flow li > span, .dashboard-flow li > span { display: grid; width: 36px; height: 36px; flex: 0 0 auto; place-items: center; border: 1px solid var(--brand-100); border-radius: 50%; color: var(--brand-700); background: var(--brand-50); font-size: .68rem; font-weight: 800; }
+.auth-flow li > div, .dashboard-flow li > div { display: grid; gap: 2px; }
+.auth-flow strong, .dashboard-flow strong { color: var(--slate-800); font-size: .82rem; }
+.auth-flow small, .dashboard-flow small { color: var(--slate-500); font-size: .7rem; }
+.auth-serial-note { margin: 26px 0 0; color: var(--slate-500); font-size: .75rem; }
+.auth-card { width: 100%; padding: clamp(28px, 5vw, 40px); border: 1px solid var(--slate-200); border-radius: 14px; background: white; box-shadow: 0 20px 50px rgb(15 23 42 / 9%); }
+.auth-card h2 { margin: 7px 0 10px; color: var(--slate-900); font-size: clamp(1.5rem, 4vw, 1.9rem); letter-spacing: -.04em; line-height: 1.25; }
 .auth-card > button { margin-top: 24px; }
 .security-note { margin: 13px 0 0; color: var(--slate-400); font-size: .72rem; }
+.dashboard-flow { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 0 0 20px; padding: 16px 18px; border: 1px solid var(--slate-200); border-radius: 12px; background: white; }
 
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .catalog-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 18px; padding: 12px 14px; border-radius: 10px; }
@@ -411,6 +424,14 @@ dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
   .topbar-context span { display: none; }
   .app-content { padding: 24px 16px 36px; }
   .page-heading { display: block; margin-bottom: 20px; }
+  .auth-page { width: min(520px, calc(100vw - 32px)); min-height: auto; grid-template-columns: 1fr; gap: 28px; margin: 28px auto; }
+  .auth-intro h1 { font-size: clamp(2.5rem, 12vw, 3.5rem); }
+  .auth-tagline { margin: 12px 0 20px; }
+  .auth-flow { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .auth-flow li { align-items: flex-start; flex-direction: column; gap: 7px; }
+  .auth-flow small { line-height: 1.45; }
+  .auth-serial-note { margin-top: 16px; }
+  .dashboard-flow { grid-template-columns: 1fr; gap: 12px; }
   .page-date { display: block; margin-top: 12px; }
   .summary-grid, .readings { grid-template-columns: 1fr; }
   .dashboard-start { align-items: stretch; flex-direction: column; }

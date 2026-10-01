@@ -37,8 +37,8 @@ onBeforeUnmount(() => {
     <button v-if="isNavigationOpen" class="navigation-backdrop" type="button" aria-label="메뉴 닫기" @click="closeNavigation" />
     <aside id="primary-navigation" class="app-sidebar" :class="{ open: isNavigationOpen }">
       <div class="brand">
-        <span class="brand-mark" aria-hidden="true">M</span>
-        <div><strong>Modbus Manager</strong><span>Device Operations</span></div>
+        <span class="brand-mark" aria-hidden="true">MS</span>
+        <div><strong>Modbus Studio</strong><span>DEVICE WORKSPACE</span></div>
       </div>
       <nav class="primary-navigation" aria-label="주 메뉴">
         <p>WORKSPACE</p>

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" fill="none">
+  <defs>
+    <linearGradient id="background" x1="45" y1="38" x2="1136" y2="630" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F172A"/>
+      <stop offset="1" stop-color="#172554"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="768" y1="124" x2="1120" y2="506" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3B82F6"/>
+      <stop offset="1" stop-color="#1D4ED8"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#background)"/>
+  <circle cx="1058" cy="77" r="225" fill="#1E3A8A" fill-opacity=".28"/>
+  <circle cx="1112" cy="555" r="240" fill="#2563EB" fill-opacity=".14"/>
+  <rect x="80" y="78" width="72" height="72" rx="20" fill="#2563EB"/>
+  <path d="M98 128V98L116 119 134 98V128" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="99" cy="137" r="3" fill="#BFDBFE"/>
+  <circle cx="116" cy="137" r="3" fill="#FFFFFF"/>
+  <circle cx="133" cy="137" r="3" fill="#BFDBFE"/>
+  <text x="174" y="124" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="34" font-weight="700">Modbus Studio</text>
+  <text x="82" y="260" fill="#93C5FD" font-family="Arial, sans-serif" font-size="21" font-weight="700" letter-spacing="4">BROWSER-BASED MODBUS WORKSPACE</text>
+  <text x="80" y="340" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="54" font-weight="700">Define. Connect. Run.</text>
+  <text x="84" y="392" fill="#CBD5E1" font-family="Arial, sans-serif" font-size="25">장비 Profile과 Recipe를 정의하고 브라우저에서 실행하세요.</text>
+  <g transform="translate(82 470)">
+    <rect width="270" height="74" fill="#172554"/>
+    <circle cx="38" cy="37" r="18" fill="#DBEAFE"/>
+    <text x="38" y="43" text-anchor="middle" fill="#1D4ED8" font-family="Arial, sans-serif" font-size="15" font-weight="700">01</text>
+    <text x="70" y="43" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="19" font-weight="700">장비 정의</text>
+    <rect x="286" width="270" height="74" fill="#172554"/>
+    <circle cx="324" cy="37" r="18" fill="#DBEAFE"/>
+    <text x="324" y="43" text-anchor="middle" fill="#1D4ED8" font-family="Arial, sans-serif" font-size="15" font-weight="700">02</text>
+    <text x="356" y="43" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="19" font-weight="700">브라우저 연결</text>
+    <rect x="572" width="270" height="74" fill="#172554"/>
+    <circle cx="610" cy="37" r="18" fill="#DBEAFE"/>
+    <text x="610" y="43" text-anchor="middle" fill="#1D4ED8" font-family="Arial, sans-serif" font-size="15" font-weight="700">03</text>
+    <text x="642" y="43" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="19" font-weight="700">Recipe 실행</text>
+  </g>
+  <g transform="translate(888 196)">
+    <rect width="232" height="232" fill="url(#accent)"/>
+    <path d="M62 154V76L116 126 170 76V154" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="62" cy="178" r="8" fill="#BFDBFE"/>
+    <circle cx="116" cy="178" r="8" fill="#FFFFFF"/>
+    <circle cx="170" cy="178" r="8" fill="#BFDBFE"/>
+  </g>
+</svg>

@@ -2,20 +2,20 @@ services:
   frontend:
     container_name: modbus-frontend
     build:
-      context: ..
+      context: .
       dockerfile: frontend/Dockerfile
       target: development
     env_file:
-      - ../.env
+      - .env
     environment:
       CHOKIDAR_USEPOLLING: "true"
     expose:
       - "5173"
     volumes:
-      - ../frontend:/workspace/frontend
-      - ../common/device-catalog-domain:/workspace/common/device-catalog-domain:ro
+      - ./frontend:/workspace/frontend
+      - ./common/device-catalog-domain:/workspace/common/device-catalog-domain:ro
       # file dependency의 설치 시점 복사본 대신 현재 공용 Catalog 계약을 개발 서버가 즉시 사용한다.
-      - ../common/device-catalog-domain:/workspace/frontend/node_modules/@modbus-manager/device-catalog-domain:ro
+      - ./common/device-catalog-domain:/workspace/frontend/node_modules/@modbus-manager/device-catalog-domain:ro
       - frontend_node_modules:/workspace/frontend/node_modules
     depends_on:
       backend:
@@ -27,21 +27,21 @@ services:
   backend:
     container_name: modbus-backend
     build:
-      context: ..
+      context: .
       dockerfile: backend/Dockerfile
       target: development
     env_file:
-      - ../.env
+      - .env
     environment:
       # Windows Docker bind mount는 새 파일 생성 이벤트를 놓칠 수 있어 TypeScript가 주기적으로 변경을 확인한다.
       TSC_WATCHFILE: DynamicPriorityPolling
     expose:
       - "3000"
     volumes:
-      - ../backend:/workspace/backend
-      - ../common/device-catalog-domain:/workspace/common/device-catalog-domain:ro
+      - ./backend:/workspace/backend
+      - ./common/device-catalog-domain:/workspace/common/device-catalog-domain:ro
       # Backend AJV도 Frontend와 동일한 최신 Schema 파일을 읽도록 package 경로를 직접 연결한다.
-      - ../common/device-catalog-domain:/workspace/backend/node_modules/@modbus-manager/device-catalog-domain:ro
+      - ./common/device-catalog-domain:/workspace/backend/node_modules/@modbus-manager/device-catalog-domain:ro
       - backend_node_modules:/workspace/backend/node_modules
       - catalog_uploads:/var/lib/modbus-manager/catalog-uploads
     healthcheck:

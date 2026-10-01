@@ -1,10 +1,12 @@
-# Modbus Web Serial Runtime
+# Modbus Studio
 
-브라우저의 Web Serial API로 Modbus RTU 장비를 연결하고, Profile과 Recipe를 이용해 장비별 동작을 정의하는 웹 애플리케이션입니다.
+Modbus Studio는 브라우저에서 Modbus RTU 장비를 정의하고 연결해 실행하는 작업 공간입니다. 관리자는 장비 Catalog의 Profile과 Recipe를 관리하고, 사용자는 지원되는 브라우저에서 Web Serial로 RS485 장비를 탐색·측정·설정합니다.
 
-표준적인 Modbus 장비는 실행 엔진이 지원하는 Step과 decoder 범위 안에서 JSON Profile/Recipe 등록만으로 추가하는 것을 목표로 합니다. 새로운 프로토콜 기능이 실제로 필요할 때만 실행 엔진을 확장합니다.
+**개발자: Ji Yong ho**
 
-현재 CWT-TH04S 온습도 센서의 측정, 장치 탐색 기반, Slave ID 및 baudrate 변경 workflow를 구현했습니다. Backend는 Google 인증과 서버 세션, MySQL migration, DB 기반 장비 Catalog 검증·관리 API, 썸네일·참고 파일·HTTPS 링크 관리를 제공합니다. Frontend는 인증된 runtime snapshot으로 활성 Catalog를 불러오며, 관리 화면에서 Catalog JSON·상태·썸네일·참고 파일·HTTPS 링크를 관리할 수 있습니다. 관리자는 별도 AI 작성 화면에서 요구사항과 참고 자료를 제출하고, 검증된 JSON 초안을 재검토하거나 승인하여 등록할 수 있습니다.
+장비별 동작 차이는 실행 엔진이 지원하는 Step과 decoder 범위에서 JSON Profile/Recipe로 표현합니다. 실제 장비에 필요한 프로토콜 능력이 현재 엔진에 없을 때만 엔진을 확장합니다.
+
+현재 구현 범위는 CWT-TH04S 온습도 센서의 측정, Catalog 기반 장비 탐색, Slave ID/baudrate 변경, 관리용 Test Group 저장·실행입니다. Catalog 관리에는 JSON 검증, 활성/비활성 상태, 300×300 JPEG 썸네일, 참고 파일과 HTTPS 링크가 포함됩니다. 선택 기능인 AI Catalog 작성·수정은 Gemini API를 사용하며, 생성된 제안은 검토·승인 후 저장됩니다.
 
 ## 설계 원칙
 
@@ -13,16 +15,18 @@ Browser / Frontend
   ├─ Web Serial 연결과 연결 상태 관리
   ├─ Modbus RTU frame 및 transaction
   ├─ Profile/Recipe 검증과 실행
-  └─ 측정, Scan, 장비 설정 workflow
+  ├─ 측정, 장비 Scan, Slave ID/baudrate 설정
+  └─ Test Group 실행과 결과 표시
 
 Backend
   ├─ Google 인증과 서버 관리형 세션
-  ├─ Catalog JSON 검증과 관리 API
-  ├─ 300×300 JPEG 썸네일과 참고 자료 API
+  ├─ Catalog JSON 검증·관리 API와 runtime snapshot
+  ├─ Test Group 저장·실행 snapshot API
+  ├─ 썸네일·참고 파일·HTTPS 링크 관리
   └─ MySQL 영속화와 migration
 
 MySQL
-  └─ 사용자, 세션, Catalog와 참고 자료 metadata
+  └─ 사용자, 세션, Catalog, 참고 자료 metadata와 Test Group
 ```
 
 USB Serial 통신은 사용자의 브라우저에서 실행됩니다. Docker container나 Backend에 USB 장치를 전달하지 않습니다.
@@ -37,23 +41,37 @@ USB Serial 통신은 사용자의 브라우저에서 실행됩니다. Docker con
 │  ├─ src/device-catalog/   API Catalog, Profile/Recipe contract와 검증
 │  ├─ src/recipe-engine/    제한된 Recipe 실행기
 │  ├─ src/application/      측정, Scan과 장비 설정 workflow
-│  └─ public/device-catalog 개발 fixture와 회귀 테스트용 JSON
+│  └─ src/test-fixtures/device-catalog 테스트 전용 Profile/Recipe JSON
 ├─ backend/                 NestJS/Fastify API 기반
 ├─ common/                  양쪽에서 사용하는 공개 Catalog 계약과 Schema
-├─ docker/                  개발용 Docker Compose
+├─ docker-compose.yml       개발용 Frontend/Backend Compose
 ├─ .agents/skills/          저장소 전용 Codex/agent 작업 지침
 ├─ AGENTS.md                공통 개발 원칙
 └─ .env.sample              공개 가능한 환경변수 예제
 ```
 
+## 실행 환경
+
+- Node.js 22와 npm
+- Docker Compose 및 외부 Docker network `shared-net`
+- 앱 데이터베이스로 사용할 MySQL 8.4 인스턴스. 데이터베이스는 이 Compose에서 생성하지 않습니다.
+- Google OpenID Connect 앱 설정과 허용할 이메일 주소
+- Web Serial 사용 시 HTTPS 배포 또는 localhost와 지원 브라우저(Chrome/Edge 계열)
+
+USB Serial 포트는 사용자 브라우저에서만 접근합니다. Backend와 Docker에는 장비 USB를 연결하지 않습니다.
+
 ## 시작
 
 ```powershell
 Copy-Item .env.sample .env
-docker compose -f docker/docker-compose.yml up --build -d
+docker compose up --build -d
 ```
 
-`.env`의 예제 도메인을 실제 HTTPS 도메인으로 변경합니다. 이 파일 하나가 Docker Compose를 통해 frontend와 backend에 전달되며 Git에는 포함되지 않습니다.
+`.env.sample`을 `.env`로 복사한 뒤 예제 값과 도메인을 실제 환경에 맞게 바꿉니다. `.env`는 Git에 포함하지 않습니다. `DATABASE_*`는 Compose 외부에서 운영하는 MySQL을 가리켜야 하며, Google OIDC callback URL은 Google 설정에 등록한 Backend 주소와 정확히 일치해야 합니다.
+
+`CORS_ORIGIN`에는 Frontend의 공개 origin만 입력합니다(경로와 마지막 `/` 없이). 이 값은 인증 callback 검증, CORS, 그리고 HTTPS 배포의 canonical/Open Graph URL에 사용됩니다. `VITE_API_BASE_URL`은 브라우저가 접근하는 Backend API base URL이며 `/api`를 포함해야 합니다. `VITE_ALLOWED_HOSTS`에는 Vite 개발 서버에 접속할 호스트 이름을 지정합니다.
+
+Compose는 호스트 포트를 공개하지 않습니다. 먼저 외부 network `shared-net`과 MySQL을 준비하고, reverse proxy 또는 Cloudflare Tunnel을 다음 내부 주소에 연결합니다.
 
 - Frontend container: `http://modbus-frontend:5173`
 - Backend health: `http://modbus-backend:3000/api/health`
@@ -62,28 +80,37 @@ docker compose -f docker/docker-compose.yml up --build -d
 ## 개발 명령
 
 ```powershell
-docker compose -f docker/docker-compose.yml logs -f frontend backend
-docker compose -f docker/docker-compose.yml down
+docker compose exec backend npm run db:migrate
+docker compose logs -f frontend backend
+docker compose down
 ```
 
-Frontend와 Backend 소스는 컨테이너에 bind mount되어 변경 시 자동으로 다시 빌드됩니다.
-현재 Compose에는 데이터베이스 서비스를 포함하지 않습니다. Backend DB 연동 시 동일한 `shared-net`의 MySQL을 사용합니다.
+첫 실행 및 Backend migration 변경 후 `db:migrate`를 실행합니다. Backend는 Google 인증 설정이 없어도 구성 상태를 Frontend에 표시할 수 있지만 로그인하려면 OIDC 설정이 필요합니다. Frontend와 Backend 소스는 컨테이너에 bind mount되어 개발 서버가 변경을 감지합니다. Compose에는 MySQL 서비스가 없으며 외부 MySQL을 `shared-net`에서 사용합니다.
 
-Catalog 첨부 파일은 `catalog_uploads` named volume에 저장됩니다. volume은 Backend에만 mount되며 Frontend web root에서는 직접 접근할 수 없습니다.
+Catalog 첨부 파일은 `catalog_uploads` named volume에 저장됩니다. 해당 volume은 Backend에만 연결되며 Frontend web root에서는 직접 접근할 수 없습니다. `docker compose down`은 named volume을 삭제하지 않습니다.
 
-AI 작성·수정 기능은 Backend의 `GEMINI_API_KEY`와 `GEMINI_CATALOG_MODEL` 설정이 있을 때만 동작합니다. AI 수정은 기존 Catalog JSON과 등록된 제품 이미지·참고 파일·HTTPS 링크를 참고하며, 제품 키는 변경하지 않고 현재 revision과 일치할 때만 수정안을 적용합니다. API key는 Frontend에 전달되지 않습니다. PDF·이미지 같은 바이너리 참고 자료는 Gemini Files API에 한 번 업로드한 뒤 같은 AI 세션의 재검토에서 재사용하며, 승인·작성 취소·세션 만료 시 provider 삭제를 시도합니다. 로컬 임시 자료는 60분 비활성 또는 생성 후 6시간이 지나면 10분 주기 청소 대상으로 처리됩니다. 브라우저 강제 종료처럼 즉시 정리를 보장할 수 없는 상황에서도 이 TTL이 최종 안전망이 됩니다.
+AI 작성·수정은 Backend의 `GEMINI_API_KEY`가 있을 때 사용할 수 있습니다. 키는 Backend에만 보관하며 Frontend로 전달하지 않습니다. 제안은 Catalog에 자동 반영되지 않고 관리자가 검토·승인해야 합니다. Gemini 모델·timeout·감사 기록 보존 기간은 `.env.sample`의 `GEMINI_*` 설정으로 조정할 수 있습니다.
 
-Gemini 요청·응답 감사 기록은 임시 파일과 수명이 다릅니다. 감사 row는 작성 취소로 지우지 않으며 `GEMINI_AUDIT_RETENTION_DAYS`에 설정한 1~365일 동안 보관한 뒤 Backend가 주기적으로 삭제합니다. 감사 기록을 조회하거나 삭제하는 별도 관리 UI는 제공하지 않습니다.
+로컬 개발에서 Docker 대신 Node.js를 사용할 때는 각 프로젝트 디렉터리에서 아래 명령을 실행합니다.
 
-두 서비스는 호스트 포트를 공개하지 않고 외부 Docker 네트워크 `shared-net`에만 연결됩니다.
-Cloudflare Tunnel의 서비스 대상은 `http://modbus-frontend:5173`과
-`http://modbus-backend:3000`입니다.
+```powershell
+cd frontend
+npm ci
+npm run dev
+npm run typecheck
+npm test
+npm run build
+```
+
+Backend는 별도 터미널의 `backend` 디렉터리에서 실행합니다. 명령은 `npm ci`, `npm run start:dev`, `npm run typecheck`, `npm test`, `npm run build`이며, 먼저 유효한 `.env`와 접근 가능한 MySQL이 필요합니다.
 
 ## 장비 등록
 
-Profile과 Recipe 작성 방법은 [Device Catalog 등록 안내](frontend/public/device-catalog/README.md)를 참고합니다.
+장비는 `CatalogBundle v1` JSON으로 표현합니다. Backend가 Schema와 참조를 검증해 DB에 저장하고, Frontend는 인증된 runtime snapshot에서 활성 Catalog를 읽습니다. Profile/Recipe 범위와 공유 Schema는 [device-catalog-domain](common/device-catalog-domain/)에서 확인할 수 있습니다. `frontend/src/test-fixtures/`의 Catalog JSON은 테스트 전용 예시이며 실제 runtime source가 아닙니다.
 
-지원 중인 Step과 decoder로 표현할 수 있는 장비는 `CatalogBundle v1` JSON으로 서버 검증 후 DB에 등록할 수 있습니다. Frontend 실행은 관리 UI가 완성될 때까지 기존 정적 Catalog도 함께 사용합니다.
+## 검증
+
+Frontend 테스트는 Web Serial과 장비를 모의해 실행합니다. 실제 통신은 HTTPS 또는 localhost의 지원 브라우저와 연결된 RS485 장비가 있어야 확인할 수 있습니다. 장비 연결·측정·설정 시 포트 권한, Slave ID, baudrate, parity와 배선을 확인합니다.
 
 ## 개발 원칙
 
