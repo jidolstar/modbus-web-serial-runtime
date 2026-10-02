@@ -332,6 +332,9 @@ dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .test-device-modal > footer { display: flex; justify-content: flex-end; gap: 8px; padding-top: 4px; }
 .test-device-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: hidden; border-radius: 10px; }
 .test-device-summary > div { display: grid; gap: 5px; padding: 20px; border-right: 1px solid var(--slate-200); }
+.test-device-summary > .test-device-summary-link { display: grid; gap: 5px; padding: 20px; border: 0; border-right: 1px solid var(--slate-200); color: inherit; background: white; cursor: pointer; font: inherit; text-align: left; }
+.test-device-summary > .test-device-summary-link:hover { background: var(--slate-50); }
+.test-device-summary > .test-device-summary-link:focus-visible { position: relative; z-index: 1; outline: 3px solid rgb(59 130 246 / 35%); outline-offset: -4px; }
 .test-device-summary > div:last-child { border-right: 0; }
 .test-device-summary span, .test-device-summary small { color: var(--slate-500); font-size: .7rem; }
 .test-device-summary strong { color: var(--slate-900); font-size: 1rem; }
@@ -360,6 +363,7 @@ dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .action-result { display: grid; gap: 7px; padding: 10px; border: 1px solid var(--slate-200); border-radius: 7px; background: white; }
 .action-result.succeeded { border-color: #a7f3d0; background: #ecfdf5; }
 .action-result.failed { border-color: #fecaca; background: #fef2f2; }
+.action-result-heading { margin: 0; color: #047857; font-size: .73rem; font-weight: 800; }
 .action-result dl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px 10px; margin: 0; }
 .action-result dt { color: var(--slate-600); font-size: .7rem; }
 .action-result dd { margin: 0; color: var(--slate-900); font-size: .76rem; font-weight: 700; }

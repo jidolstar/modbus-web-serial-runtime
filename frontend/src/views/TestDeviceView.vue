@@ -3,7 +3,6 @@ import { nextTick, onMounted, ref } from 'vue'
 import { createTestDevice, type TestDevice } from '../application/test-device'
 import { catalogApi, type CatalogDetail } from '../device-catalog/catalog-api'
 import type { AppRoute } from '../device-catalog/catalog-route'
-import TestDeviceFormModal from '../features/test-device/TestDeviceFormModal.vue'
 import TestDeviceRuntimePanel from '../features/test-device/TestDeviceRuntimePanel.vue'
 import { testBusSession } from '../application/test-bus-session'
 
@@ -14,7 +13,6 @@ const emit = defineEmits<{ navigate: [route: AppRoute] }>()
 const catalog = ref<CatalogDetail | null>(null)
 const device = ref<TestDevice | null>(null)
 const errorMessage = ref<string | null>(null)
-const editorOpen = ref(false)
 const connectionActive = ref(false)
 const configurationPending = ref(false)
 const connecting = ref(false)
@@ -49,26 +47,22 @@ async function disconnectBus(): Promise<void> {
   await runtimePanel.value?.disconnect()
 }
 
-function save(updated: TestDevice): void {
-  editorOpen.value = false
+/** 설정 쓰기 뒤 검증된 장비 context를 화면과 URL에 반영한다. */
+function applyRuntimeDevice(updated: TestDevice): void {
   device.value = updated
   emit('navigate', { page: 'test-device', name: updated.name, catalogKey: updated.catalogKey, catalogRevision: updated.catalogRevision, baudRate: updated.serialConfig.baudRate, slaveId: updated.slaveId, origin: updated.origin })
 }
-
-/** 검증된 장비 설정 변경 결과를 화면 context와 URL에 함께 반영한다. */
-function applyRuntimeDevice(updated: TestDevice): void { save(updated) }
 
 onMounted(load)
 </script>
 
 <template>
-  <header class="page-heading detail-page-heading"><div><p class="eyebrow">DEVICE CONNECTION</p><h1>{{ device?.name ?? '테스트 장비' }}</h1><p class="description">Catalog가 정의한 측정값을 브라우저에서 주기적으로 확인합니다.</p></div><div v-if="device" class="page-heading-actions"><button class="button button-ghost" type="button" :disabled="configurationPending" @click="editorOpen = true">카탈로그 수정</button><button v-if="!connectionActive" class="button button-primary" type="button" :disabled="connecting || configurationPending" @click="connectBus(false)">{{ connecting ? '연결 중…' : '테스트 버스 연결' }}</button><button v-else class="button button-secondary" type="button" @click="disconnectBus">COM 포트 연결 끊기</button></div></header>
+  <header class="page-heading detail-page-heading"><div><p class="eyebrow">DEVICE CONNECTION</p><h1>{{ device?.name ?? '테스트 장비' }}</h1><p class="description">Catalog가 정의한 측정값을 브라우저에서 주기적으로 확인합니다.</p></div><div v-if="device" class="page-heading-actions"><button v-if="!connectionActive" class="button button-primary" type="button" :disabled="connecting || configurationPending" @click="connectBus(false)">{{ connecting ? '연결 중…' : '테스트 버스 연결' }}</button><button v-else class="button button-secondary" type="button" @click="disconnectBus">COM 포트 연결 끊기</button></div></header>
   <p v-if="errorMessage" class="notice error">{{ errorMessage }}</p>
   <section v-else-if="device && catalog" class="surface-card test-device-summary">
-    <div><span>Catalog</span><strong>{{ catalog.title }}</strong><small>{{ catalog.manufacturer }} · {{ catalog.model }} · revision {{ catalog.revision }}</small></div>
+    <button class="test-device-summary-link" type="button" @click="emit('navigate', { page: 'catalog-view', catalogKey: props.route.catalogKey })"><span>Catalog</span><strong>{{ catalog.title }}</strong><small>{{ catalog.manufacturer }} · {{ catalog.model }} · revision {{ catalog.revision }}</small></button>
     <div><span>Baudrate</span><strong>{{ device.serialConfig.baudRate.toLocaleString() }}</strong><small>{{ device.serialConfig.dataBits }}{{ device.serialConfig.parity.charAt(0).toUpperCase() }}{{ device.serialConfig.stopBits }}</small></div>
     <div><span>Slave ID</span><strong>{{ device.slaveId }}</strong><small>{{ device.origin === 'scan' ? 'Scan 결과에서 생성' : 'Catalog에서 생성' }}</small></div>
   </section>
   <TestDeviceRuntimePanel v-if="device && catalog" ref="runtimePanel" :device="device" :catalog="catalog" @connection-change="connectionActive = $event" @configuration-pending="configurationPending = $event" @device-change="applyRuntimeDevice" />
-  <TestDeviceFormModal v-if="catalog && device" :open="editorOpen" :catalogs="[catalog]" :initial-device="device" :connection-active="connectionActive" catalog-locked @cancel="editorOpen = false" @save="save" />
 </template>

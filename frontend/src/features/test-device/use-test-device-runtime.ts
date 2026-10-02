@@ -7,6 +7,7 @@ import { SensorMonitor } from '../../application/sensor-monitor'
 import type { TestDevice } from '../../application/test-device'
 import { testBusSession } from '../../application/test-bus-session'
 import type { CatalogDetail } from '../../device-catalog/catalog-api'
+import { RecipeStepType } from '../../device-catalog/recipe.types'
 import { ModbusFrameDirection } from '../../modbus/modbus-types'
 import { ModbusExceptionError, ModbusTimeoutError } from '../../modbus/modbus-errors'
 import { RecipeAbortedError, RecipeExecutionError } from '../../recipe-engine/recipe-execution-errors'
@@ -194,6 +195,7 @@ export function useTestDeviceRuntime(
     operationMessage.value = '미확정 설정을 닫았습니다. 장비 상태가 불분명하면 Scan 또는 수동 설정으로 확인해 주세요.'
   }
 
+  /** Operation 카드에서 Recipe를 한 번 실행하고 쓰기 응답·측정 결과 또는 실패를 카드별로 남긴다. */
   async function runAction(recipeId: string, parameters: Readonly<Record<string, unknown>>): Promise<void> {
     if (!isConnected.value || operationBusy.value) return
     operationBusy.value = true; operationMessage.value = null; operationError.value = null
@@ -204,9 +206,15 @@ export function useTestDeviceRuntime(
       const actionOutputs = Object.entries(result.outputs).map(([name, output]) => Object.freeze({
         name, displayValue: output.display.text, unit: output.display.unit,
       }))
+      const recipe = recipesById.get(recipeId)
+      const isWriteAction = recipe?.steps.some(({ type }) => type === RecipeStepType.WriteSingleRegister) ?? false
       setActionState(recipeId, {
         status: 'succeeded', outputs: Object.freeze(actionOutputs),
-        message: actionOutputs.length ? undefined : '장비 응답을 확인했습니다.',
+        message: actionOutputs.length
+          ? undefined
+          : isWriteAction
+            ? `쓰기 요청의 정상 응답을 확인했습니다. 입력값 ${Object.entries(parameters).map(([name, value]) => `${name}: ${String(value)}`).join(', ')} · 실제 저장값은 현재값 읽기로 확인해 주세요.`
+            : '장비 응답을 확인했습니다.',
         completedAt: new Date().toLocaleTimeString('ko-KR'),
       })
     } catch (error) {

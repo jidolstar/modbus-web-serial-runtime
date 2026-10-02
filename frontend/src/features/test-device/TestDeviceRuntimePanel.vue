@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref, toRef, watch } from 'vue'
+import { computed, nextTick, reactive, ref, toRef, watch } from 'vue'
 import { RecipeStepType, STANDARD_DEVICE_ID_PARAMETER, type Recipe, type RecipeParameter } from '../../device-catalog/recipe.types'
 import type { TestDevice } from '../../application/test-device'
 import type { CatalogDetail } from '../../device-catalog/catalog-api'
@@ -11,11 +11,18 @@ const runtime = useTestDeviceRuntime(toRef(props, 'device'), props.catalog, (dev
 const targetSlaveId = ref(props.device.slaveId)
 const targetBaudRate = ref(props.device.serialConfig.baudRate)
 const pendingConfirmation = ref<{ type: 'slaveId' | 'baudRate' | 'action'; recipe?: Recipe } | null>(null)
+const confirmationDialog = ref<HTMLDialogElement | null>(null)
 const actionValues = reactive<Record<string, Record<string, string | number>>>({})
 const connectionDescription = computed(() => `${props.device.serialConfig.baudRate.toLocaleString()} baud · ${props.device.serialConfig.dataBits}${props.device.serialConfig.parity.charAt(0).toUpperCase()}${props.device.serialConfig.stopBits} · Slave ID ${props.device.slaveId}`)
 watch(runtime.isConnected, (connected) => emit('connectionChange', connected), { immediate: true })
 watch(runtime.pendingConfiguration, (pending) => emit('configurationPending', pending !== null), { immediate: true })
 watch(() => props.device, (next) => { targetSlaveId.value = next.slaveId; targetBaudRate.value = next.serialConfig.baudRate })
+// 확인 상태의 수명에 맞춰 브라우저 모달을 열고 닫아 배경 조작을 막는다.
+watch(pendingConfirmation, async (pending) => {
+  await nextTick()
+  if (pending && confirmationDialog.value && !confirmationDialog.value.open) confirmationDialog.value.showModal()
+  else if (!pending && confirmationDialog.value?.open) confirmationDialog.value.close()
+})
 
 function visibleActionParameters(recipe: Recipe): readonly RecipeParameter[] {
   return recipe.parameters?.filter(({ name }) => name !== STANDARD_DEVICE_ID_PARAMETER) ?? []
@@ -65,6 +72,11 @@ async function confirmOperation(): Promise<void> {
   else if (pending.type === 'baudRate') await runtime.runConfiguration('baudRate', targetBaudRate.value)
   else if (pending.recipe) await runtime.runAction(pending.recipe.id, { ...ensureActionValues(pending.recipe) })
 }
+
+function closeConfirmation(event: Event): void {
+  event.preventDefault()
+  pendingConfirmation.value = null
+}
 for (const recipe of runtime.actionRecipes) ensureActionValues(recipe)
 defineExpose({ connect: runtime.connect, disconnect: runtime.disconnect, isConnected: runtime.isConnected, isTransitioning: runtime.isTransitioning })
 </script>
@@ -108,15 +120,17 @@ defineExpose({ connect: runtime.connect, disconnect: runtime.disconnect, isConne
         <button class="button button-secondary" type="button" :disabled="!runtime.isConnected.value || runtime.operationBusy.value || !!runtime.pendingConfiguration.value || !actionParametersValid(recipe)" @click="prepareAction(recipe)">{{ isWriteAction(recipe) ? '값 입력 및 확인' : '현재값 읽기' }}</button>
         <div v-if="runtime.actionStates.value[recipe.id]" class="action-result" :class="runtime.actionStates.value[recipe.id].status" :role="runtime.actionStates.value[recipe.id].status === 'failed' ? 'alert' : 'status'" aria-live="polite">
           <p v-if="runtime.actionStates.value[recipe.id].status === 'running'">작업을 실행하고 있습니다.</p>
-          <dl v-else-if="runtime.actionStates.value[recipe.id].outputs.length">
+          <p v-if="runtime.actionStates.value[recipe.id].status === 'succeeded'" class="action-result-heading">{{ isWriteAction(recipe) ? '쓰기 성공 · 장비 응답 확인' : '작업 성공' }}</p>
+          <dl v-if="runtime.actionStates.value[recipe.id].outputs.length">
             <template v-for="output in runtime.actionStates.value[recipe.id].outputs" :key="output.name"><dt>{{ output.name }}</dt><dd>{{ output.displayValue }}<small v-if="output.unit"> {{ output.unit }}</small></dd></template>
           </dl>
-          <p v-else>{{ runtime.actionStates.value[recipe.id].message }}</p>
+          <p v-if="runtime.actionStates.value[recipe.id].message">{{ runtime.actionStates.value[recipe.id].message }}</p>
           <small v-if="runtime.actionStates.value[recipe.id].completedAt">마지막 성공 {{ runtime.actionStates.value[recipe.id].completedAt }}</small>
         </div>
       </article>
     </div>
-    <div v-if="pendingConfirmation" class="operation-confirm" role="region" aria-labelledby="operation-confirm-title">
+    <dialog v-if="pendingConfirmation" ref="confirmationDialog" class="test-device-dialog device-operation-dialog" aria-labelledby="operation-confirm-title" @cancel="closeConfirmation">
+      <section class="operation-confirm">
       <h3 id="operation-confirm-title">장비에 쓰기 전에 확인해 주세요</h3>
       <p><strong>{{ device.name }}</strong> · Slave ID {{ device.slaveId }}에 {{ pendingConfirmation.type === 'slaveId' ? `Slave ID ${targetSlaveId}` : pendingConfirmation.type === 'baudRate' ? `baudrate ${targetBaudRate.toLocaleString()}` : pendingConfirmation.recipe?.name }} 작업을 실행합니다.</p>
       <p v-if="pendingConfirmation.type !== 'action'">쓰기 응답을 받으면 현재 COM 포트 연결을 먼저 종료하고, 새 Slave ID와 baudrate로 화면을 다시 연 뒤 자동 연결합니다. 설정 적용에 전원 재인가가 필요한 장비는 자동 연결에 실패할 수 있습니다.</p>
@@ -128,7 +142,8 @@ defineExpose({ connect: runtime.connect, disconnect: runtime.disconnect, isConne
         </label>
       </div>
       <div class="inline-actions"><button class="button button-ghost" type="button" @click="pendingConfirmation = null">취소</button><button class="button button-primary" type="button" @click="confirmOperation">{{ pendingConfirmation.type === 'action' ? '확인하고 실행' : '설정 쓰기' }}</button></div>
-    </div>
+      </section>
+    </dialog>
     <section v-if="runtime.pendingConfiguration.value" class="operation-confirm" aria-labelledby="reconnect-guide-title">
       <h3 id="reconnect-guide-title">새 설정으로 다시 연결해 확인해 주세요</h3>
       <p v-if="runtime.pendingConfiguration.value.delivery === 'uncertain'" class="notice error" role="alert">쓰기 응답을 받지 못해 설정 적용 여부가 불분명합니다. 새 설정으로 먼저 확인하고, 실패하면 Scan 또는 수동 설정으로 현재값을 찾아주세요.</p>
