@@ -92,7 +92,6 @@ docker compose -f docker/dev/docker-compose.yml down
 개발 및 운영 Docker 파일은 `docker/dev`와 `docker/prod` 아래에 각각 모았습니다. EC2에서 저장소를 clone한 뒤 `.env.sample`을 `.env`로 복사하고 운영 설정을 입력합니다. `docker/prod/run.sh`는 외부 Docker network `shared-net`을 준비하고 운영 이미지 기동과 DB migration을 수행합니다.
 
 ```bash
-chmod +x docker/prod/*.sh
 ./docker/prod/run.sh
 ```
 
