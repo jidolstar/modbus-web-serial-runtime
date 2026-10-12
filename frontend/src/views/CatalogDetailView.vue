@@ -42,9 +42,12 @@ async function load(): Promise<void> {
   loading.value = true; notice.value = null
   try {
     const catalog = await catalogApi.get(props.catalogKey)
+    // 썸네일은 부가 자료이므로 파일이 유실되거나 조회에 실패해도 상세 로딩을 막지 않는다.
+    const thumbnailRequest = catalog.hasThumbnail
+      ? catalogApi.getThumbnailBlob(props.catalogKey).catch(() => null)
+      : Promise.resolve(null)
     const [fileItems, linkItems, thumbnail] = await Promise.all([
-      catalogApi.listFiles(props.catalogKey), catalogApi.listLinks(props.catalogKey),
-      catalog.hasThumbnail ? catalogApi.getThumbnailBlob(props.catalogKey) : Promise.resolve(null),
+      catalogApi.listFiles(props.catalogKey), catalogApi.listLinks(props.catalogKey), thumbnailRequest,
     ])
     detail.value = catalog; files.value = fileItems; links.value = linkItems
     if (thumbnail) thumbnailUrl.value = URL.createObjectURL(thumbnail)
