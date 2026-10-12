@@ -1,0 +1,55 @@
+services:
+  frontend:
+    container_name: modbus-frontend
+    build:
+      context: ../..
+      dockerfile: docker/prod/frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:?VITE_API_BASE_URL is required}
+        VITE_SENSOR_POLL_INTERVAL_MS: ${VITE_SENSOR_POLL_INTERVAL_MS:-3000}
+        VITE_MODBUS_TRANSACTION_TIMEOUT_MS: ${VITE_MODBUS_TRANSACTION_TIMEOUT_MS:-1200}
+        CORS_ORIGIN: ${CORS_ORIGIN:?CORS_ORIGIN is required}
+    ports:
+      # 기존 호스트 nginx에서만 접근할 수 있도록 loopback에 바인딩한다.
+      - 127.0.0.1:5173:80
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - shared-net
+    restart: unless-stopped
+
+  backend:
+    container_name: modbus-backend
+    build:
+      context: ../..
+      dockerfile: docker/prod/backend/Dockerfile
+    env_file:
+      - ../../.env
+    environment:
+      NODE_ENV: production
+    ports:
+      - 127.0.0.1:3000:3000
+    volumes:
+      - catalog_uploads:/var/lib/modbus-manager/catalog-uploads
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://localhost:'+(process.env.PORT||3000)+'/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+    networks:
+      - shared-net
+    restart: unless-stopped
+
+networks:
+  shared-net:
+    external: true
+    name: shared-net
+
+volumes:
+  catalog_uploads:

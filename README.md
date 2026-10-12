@@ -44,7 +44,9 @@ USB Serial 통신은 사용자의 브라우저에서 실행됩니다. Docker con
 │  └─ src/test-fixtures/device-catalog 테스트 전용 Profile/Recipe JSON
 ├─ backend/                 NestJS/Fastify API 기반
 ├─ common/                  양쪽에서 사용하는 공개 Catalog 계약과 Schema
-├─ docker-compose.yml       개발용 Frontend/Backend Compose
+├─ docker/
+│  ├─ dev/                  개발용 Compose, Dockerfile과 run.bat
+│  └─ prod/                 운영용 Compose, Dockerfile, nginx 설정과 운영 스크립트
 ├─ .agents/skills/          저장소 전용 Codex/agent 작업 지침
 ├─ AGENTS.md                공통 개발 원칙
 └─ .env.sample              공개 가능한 환경변수 예제
@@ -64,14 +66,14 @@ USB Serial 포트는 사용자 브라우저에서만 접근합니다. Backend와
 
 ```powershell
 Copy-Item .env.sample .env
-docker compose up --build -d
+docker\dev\run.bat
 ```
 
 `.env.sample`을 `.env`로 복사한 뒤 예제 값과 도메인을 실제 환경에 맞게 바꿉니다. `.env`는 Git에 포함하지 않습니다. `DATABASE_*`는 Compose 외부에서 운영하는 MySQL을 가리켜야 하며, Google OIDC callback URL은 Google 설정에 등록한 Backend 주소와 정확히 일치해야 합니다.
 
 `CORS_ORIGIN`에는 Frontend의 공개 origin만 입력합니다(경로와 마지막 `/` 없이). 이 값은 인증 callback 검증, CORS, 그리고 HTTPS 배포의 canonical/Open Graph URL에 사용됩니다. `VITE_API_BASE_URL`은 브라우저가 접근하는 Backend API base URL이며 `/api`를 포함해야 합니다. `VITE_ALLOWED_HOSTS`에는 Vite 개발 서버에 접속할 호스트 이름을 지정합니다.
 
-Compose는 호스트 포트를 공개하지 않습니다. 먼저 외부 network `shared-net`과 MySQL을 준비하고, reverse proxy 또는 Cloudflare Tunnel을 다음 내부 주소에 연결합니다.
+개발 Compose는 호스트 포트를 공개하지 않습니다. `run.bat`이 외부 Docker network `shared-net`을 준비합니다. Frontend와 Backend 컨테이너는 해당 네트워크에 연결된 MySQL 및 reverse proxy에서 다음 주소로 접근할 수 있습니다.
 
 - Frontend container: `http://modbus-frontend:5173`
 - Backend health: `http://modbus-backend:3000/api/health`
@@ -80,14 +82,38 @@ Compose는 호스트 포트를 공개하지 않습니다. 먼저 외부 network 
 ## 개발 명령
 
 ```powershell
-docker compose exec backend npm run db:migrate
-docker compose logs -f frontend backend
-docker compose down
+docker compose -f docker/dev/docker-compose.yml exec backend npm run db:migrate
+docker compose -f docker/dev/docker-compose.yml logs -f frontend backend
+docker compose -f docker/dev/docker-compose.yml down
 ```
 
-첫 실행 및 Backend migration 변경 후 `db:migrate`를 실행합니다. Backend는 Google 인증 설정이 없어도 구성 상태를 Frontend에 표시할 수 있지만 로그인하려면 OIDC 설정이 필요합니다. Frontend와 Backend 소스는 컨테이너에 bind mount되어 개발 서버가 변경을 감지합니다. Compose에는 MySQL 서비스가 없으며 외부 MySQL을 `shared-net`에서 사용합니다.
+### EC2 운영 배포
 
-Catalog 첨부 파일은 `catalog_uploads` named volume에 저장됩니다. 해당 volume은 Backend에만 연결되며 Frontend web root에서는 직접 접근할 수 없습니다. `docker compose down`은 named volume을 삭제하지 않습니다.
+개발 및 운영 Docker 파일은 `docker/dev`와 `docker/prod` 아래에 각각 모았습니다. EC2에서 저장소를 clone한 뒤 `.env.sample`을 `.env`로 복사하고 운영 설정을 입력합니다. `docker/prod/run.sh`는 외부 Docker network `shared-net`을 준비하고 운영 이미지 기동과 DB migration을 수행합니다.
+
+```bash
+chmod +x docker/prod/*.sh
+./docker/prod/run.sh
+```
+
+코드를 업데이트한 뒤에는 원하는 tag 또는 commit으로 checkout하고 아래 명령으로 다시 빌드·기동합니다. 이 스크립트는 Git pull이나 checkout을 자동 실행하지 않습니다.
+
+```bash
+./docker/prod/restart.sh
+```
+
+운영 Compose는 Frontend를 `127.0.0.1:5173`, Backend를 `127.0.0.1:3000`에만 공개합니다. 기존 호스트 nginx는 각 도메인의 upstream을 해당 로컬 포트로 연결하면 됩니다. Frontend용 `VITE_API_BASE_URL`은 브라우저가 접근할 HTTPS API 주소이며 `/api`를 포함해야 합니다. `CORS_ORIGIN`과 OIDC callback도 실제 공개 HTTPS 주소에 맞춥니다.
+
+```bash
+./docker/prod/logs.sh
+./docker/prod/stop.sh
+```
+
+`stop.sh`는 컨테이너만 중지·제거하며 Catalog 업로드 named volume은 보존합니다. 업로드와 외부 MySQL은 서버 백업에 포함해야 합니다.
+
+Backend는 Google 인증 설정이 없어도 구성 상태를 Frontend에 표시할 수 있지만 로그인하려면 OIDC 설정이 필요합니다. 개발 Compose는 소스를 bind mount해 변경을 감지합니다. 운영 Compose는 정적 Frontend와 빌드된 Backend를 사용합니다. 두 Compose 모두 MySQL을 생성하지 않으며 외부 MySQL을 `shared-net`에서 사용합니다.
+
+Catalog 첨부 파일은 `catalog_uploads` named volume에 저장됩니다. 해당 volume은 Backend에만 연결되며 Frontend web root에서는 직접 접근할 수 없습니다. Compose의 `down` 명령은 named volume을 삭제하지 않습니다.
 
 AI 작성·수정은 Backend의 `GEMINI_API_KEY`가 있을 때 사용할 수 있습니다. 키는 Backend에만 보관하며 Frontend로 전달하지 않습니다. 제안은 Catalog에 자동 반영되지 않고 관리자가 검토·승인해야 합니다. Gemini 모델·timeout·감사 기록 보존 기간은 `.env.sample`의 `GEMINI_*` 설정으로 조정할 수 있습니다.
 
