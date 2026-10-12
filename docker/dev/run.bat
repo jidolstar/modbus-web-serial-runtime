@@ -20,5 +20,5 @@ docker network inspect shared-net >nul 2>&1
 if errorlevel 1 docker network create shared-net >nul
 if errorlevel 1 exit /b 1
 
-docker compose -f docker/dev/docker-compose.yml up --build -d
+docker compose --env-file "%REPO_ROOT%\.env" -f docker/dev/docker-compose.yml up --build -d
 exit /b %errorlevel%

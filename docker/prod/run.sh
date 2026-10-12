@@ -21,5 +21,5 @@ if ! docker network inspect shared-net >/dev/null 2>&1; then
   docker network create shared-net >/dev/null
 fi
 
-docker compose -f docker/prod/docker-compose.yml up --build -d
-docker compose -f docker/prod/docker-compose.yml exec -T backend node dist/database/migrate-cli.js up
+docker compose --env-file "$REPO_ROOT/.env" -f docker/prod/docker-compose.yml up --build -d
+docker compose --env-file "$REPO_ROOT/.env" -f docker/prod/docker-compose.yml exec -T backend node dist/database/migrate-cli.js up
