@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ModbusTimeoutError } from '../modbus/modbus-errors'
 import type { ModbusClient } from '../modbus/modbus-types'
 import { MockSerialTransport } from '../serial/testing/mock-serial-transport'
@@ -42,6 +42,20 @@ describe('CatalogAwareScanner', () => {
       if (startedTargets.at(-1) !== key) startedTargets.push(key)
     })
     expect(startedTargets).toEqual(['4800/1', '4800/2', '9600/1', '9600/2'])
+  })
+
+  it('같은 baudrate의 다음 Slave ID 요청 전에 100ms 대기한다', async () => {
+    const transport = new MockSerialTransport()
+    await transport.requestPort()
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout')
+    const scanner = new CatalogAwareScanner(transport, RESPONDING_CLIENT, 0)
+
+    try {
+      await scanner.scan({ baudRates: [4_800], slaveIds: [1, 2] })
+      expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 100)
+    } finally {
+      setTimeoutSpy.mockRestore()
+    }
   })
 
   it('완료 callback에서 취소하면 다음 Slave ID를 요청하지 않는다', async () => {

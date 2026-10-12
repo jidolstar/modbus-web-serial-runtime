@@ -11,7 +11,7 @@ import { RecipeAbortedError } from '../recipe-engine/recipe-execution-errors'
 import { ModbusTimeoutError } from '../modbus/modbus-errors'
 
 const bundle = new DeviceProfileValidator().validateCatalogBundle(catalog, 'fixture')
-const group: TestGroup = { id: 1, name: '그룹', revision: 1, serialConfig: { baudRate: 9600, dataBits: 8, stopBits: 1, parity: SerialParity.None, flowControl: SerialFlowControl.None }, nodes: [{ id: 1, name: 'A', catalogKey: 'cwt-th04s', catalogRevision: 1, slaveId: 1, position: 0 }, { id: 2, name: 'B', catalogKey: 'cwt-th04s', catalogRevision: 1, slaveId: 2, position: 1 }], createdAt: '', updatedAt: '' }
+const group: TestGroup = { id: 1, name: '그룹', revision: 1, serialConfig: { baudRate: 9600, dataBits: 8, stopBits: 1, parity: SerialParity.None, flowControl: SerialFlowControl.None }, nodes: [{ id: 1, name: 'A', catalogKey: 'cwt-th04s', slaveId: 1, position: 0 }, { id: 2, name: 'B', catalogKey: 'cwt-th04s', slaveId: 2, position: 1 }], createdAt: '', updatedAt: '' }
 class MockRunner implements RecipeRunner {
   public constructor(private readonly executeImplementation: RecipeRunner['execute']) {}
   public execute(...parameters: Parameters<RecipeRunner['execute']>): Promise<RecipeExecutionResult> { return this.executeImplementation(...parameters) }

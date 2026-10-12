@@ -6,7 +6,7 @@ import type { TestGroupWriteInput } from './test-group-input'
 
 export type TestGroupRow = Selectable<TestGroupsTable>
 export type TestGroupNodeRow = Selectable<TestGroupNodesTable> & { readonly catalog_key: string }
-export interface ResolvedNodeInput { readonly name: string; readonly catalogId: number; readonly catalogRevision: number; readonly slaveId: number }
+export interface ResolvedNodeInput { readonly name: string; readonly catalogId: number; readonly slaveId: number }
 
 /** TestGroupService가 검증한 Group을 사용자 소유권 조건과 transaction으로 저장한다. */
 @Injectable()
@@ -24,7 +24,7 @@ export class TestGroupRepository {
     return this.database.transaction().execute(async (transaction) => {
       const created = await transaction.insertInto('test_groups').values({ owner_user_id: userId, name: input.name, baud_rate: input.serialConfig.baudRate, data_bits: input.serialConfig.dataBits, stop_bits: input.serialConfig.stopBits, parity: input.serialConfig.parity, flow_control: input.serialConfig.flowControl }).executeTakeFirstOrThrow()
       const groupId = Number(created.insertId)
-      await transaction.insertInto('test_group_nodes').values(nodes.map((node, position) => ({ test_group_id: groupId, name: node.name, catalog_id: node.catalogId, catalog_revision: node.catalogRevision, slave_id: node.slaveId, position }))).execute()
+      await transaction.insertInto('test_group_nodes').values(nodes.map((node, position) => ({ test_group_id: groupId, name: node.name, catalog_id: node.catalogId, slave_id: node.slaveId, position }))).execute()
       return groupId
     })
   }
@@ -34,7 +34,7 @@ export class TestGroupRepository {
       const result = await transaction.updateTable('test_groups').set({ name: input.name, baud_rate: input.serialConfig.baudRate, data_bits: input.serialConfig.dataBits, stop_bits: input.serialConfig.stopBits, parity: input.serialConfig.parity, flow_control: input.serialConfig.flowControl, revision: revision + 1 }).where('id', '=', id).where('owner_user_id', '=', userId).where('revision', '=', revision).executeTakeFirst()
       if (result.numUpdatedRows !== 1n) return false
       await transaction.deleteFrom('test_group_nodes').where('test_group_id', '=', id).execute()
-      await transaction.insertInto('test_group_nodes').values(nodes.map((node, position) => ({ test_group_id: id, name: node.name, catalog_id: node.catalogId, catalog_revision: node.catalogRevision, slave_id: node.slaveId, position }))).execute()
+      await transaction.insertInto('test_group_nodes').values(nodes.map((node, position) => ({ test_group_id: id, name: node.name, catalog_id: node.catalogId, slave_id: node.slaveId, position }))).execute()
       return true
     })
   }

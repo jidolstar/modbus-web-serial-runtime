@@ -35,12 +35,16 @@ describe('Swagger integration', { skip: !runIntegrationTests }, () => {
       '/api/catalogs/{catalogKey}/links',
       '/api/catalogs/{catalogKey}/links/{linkId}',
       '/api/runtime/catalog',
+      '/api/test-groups',
+      '/api/test-groups/{id}',
+      '/api/test-groups/{id}/runtime-snapshot',
     ]) {
       assert.match(document, new RegExp(`"${path.replaceAll('/', '\\/')}"`))
     }
     assert.match(document, /"sessionCookie"/)
     assert.match(document, /"examples"/)
     assert.match(document, /"hasThumbnail"/)
+    assert.doesNotMatch(document, /catalogRevision|TEST_GROUP_CATALOG_REVISION_CHANGED/)
 
     for (const secret of [
       config.auth.jwtSecret,

@@ -6,7 +6,8 @@ import { TestGroupError } from './test-group.error'
 import type { TestGroupWriteInput } from './test-group-input'
 import { TestGroupRepository, type ResolvedNodeInput, type TestGroupNodeRow, type TestGroupRow } from './test-group.repository'
 
-export interface TestGroupNode { readonly id: number; readonly name: string; readonly catalogKey: string; readonly catalogRevision: number; readonly slaveId: number; readonly position: number }
+/** Test Group node는 Catalog key만 참조하고, 실행 시 해당 key의 현재 정의를 사용한다. */
+export interface TestGroupNode { readonly id: number; readonly name: string; readonly catalogKey: string; readonly slaveId: number; readonly position: number }
 export interface TestGroup { readonly id: number; readonly name: string; readonly revision: number; readonly serialConfig: SerialConfig; readonly nodes: readonly TestGroupNode[]; readonly createdAt: string; readonly updatedAt: string }
 
 /** Controller의 사용자별 Group CRUD와 실행 snapshot 생성을 조정한다. */
@@ -34,34 +35,34 @@ export class TestGroupService {
 
   public async delete(id: number, userId: number): Promise<void> { if (!await this.groups.delete(id, userId)) throw new TestGroupError('TEST_GROUP_NOT_FOUND', 404) }
 
-  /** 실행 직전에 활성 상태와 revision을 다시 확인한 원자적 의미 snapshot을 만든다. */
+  /** 실행 직전에 활성 Catalog를 다시 확인하고 현재 정의로 snapshot을 만든다. */
   public async runtimeSnapshot(id: number, userId: number): Promise<{ readonly group: TestGroup; readonly catalogs: Readonly<Record<string, CatalogBundle>> }> {
     const group = await this.get(id, userId)
     const definitions: Record<string, CatalogBundle> = {}
     for (const node of group.nodes) {
       const row = await this.catalogs.findByKey(node.catalogKey)
       if (!row || !row.enabled) throw new TestGroupError('TEST_GROUP_CATALOG_UNAVAILABLE', 409, [`nodes/${node.position}/catalogKey`])
-      if (row.revision !== node.catalogRevision) throw new TestGroupError('TEST_GROUP_CATALOG_REVISION_CHANGED', 409, [`nodes/${node.position}/catalogRevision`])
       definitions[node.catalogKey] = this.catalogValidator.validate(typeof row.definition_json === 'string' ? JSON.parse(row.definition_json) : row.definition_json)
     }
     return Object.freeze({ group, catalogs: Object.freeze(definitions) })
   }
 
+  /** 생성·수정 요청의 key로 현재 활성 Catalog를 찾고 통신 설정과 Slave ID 범위를 검증한다. */
   private async resolveNodes(input: TestGroupWriteInput): Promise<readonly ResolvedNodeInput[]> {
     const resolved: ResolvedNodeInput[] = []
     for (const [index, node] of input.nodes.entries()) {
       const row = await this.catalogs.findByKey(node.catalogKey)
-      if (!row || !row.enabled || row.revision !== node.catalogRevision) throw new TestGroupError('TEST_GROUP_CATALOG_UNAVAILABLE', 400, [`/nodes/${index}/catalogKey`])
+      if (!row || !row.enabled) throw new TestGroupError('TEST_GROUP_CATALOG_UNAVAILABLE', 400, [`/nodes/${index}/catalogKey`])
       const bundle = this.catalogValidator.validate(typeof row.definition_json === 'string' ? JSON.parse(row.definition_json) : row.definition_json)
       if (!bundle.profile.serial.supportedBaudRates.includes(input.serialConfig.baudRate)) throw new TestGroupError('TEST_GROUP_INVALID_INPUT', 400, [`/nodes/${index}/catalogKey`])
       if (node.slaveId < bundle.profile.slave.minId || node.slaveId > bundle.profile.slave.maxId) throw new TestGroupError('TEST_GROUP_INVALID_INPUT', 400, [`/nodes/${index}/slaveId`])
-      resolved.push(Object.freeze({ name: node.name, catalogId: row.id, catalogRevision: node.catalogRevision, slaveId: node.slaveId }))
+      resolved.push(Object.freeze({ name: node.name, catalogId: row.id, slaveId: node.slaveId }))
     }
     return Object.freeze(resolved)
   }
 
   private async requireGroup(id: number, userId: number): Promise<TestGroupRow> { const row = await this.groups.findGroup(id, userId); if (!row) throw new TestGroupError('TEST_GROUP_NOT_FOUND', 404); return row }
   private async toGroup(row: TestGroupRow, nodes: readonly TestGroupNodeRow[]): Promise<TestGroup> {
-    return Object.freeze({ id: row.id, name: row.name, revision: row.revision, serialConfig: Object.freeze({ baudRate: row.baud_rate, dataBits: row.data_bits, stopBits: row.stop_bits, parity: row.parity, flowControl: row.flow_control }), nodes: Object.freeze(nodes.map((node) => Object.freeze({ id: node.id, name: node.name, catalogKey: node.catalog_key, catalogRevision: node.catalog_revision, slaveId: node.slave_id, position: node.position }))), createdAt: row.created_at.toISOString(), updatedAt: row.updated_at.toISOString() })
+    return Object.freeze({ id: row.id, name: row.name, revision: row.revision, serialConfig: Object.freeze({ baudRate: row.baud_rate, dataBits: row.data_bits, stopBits: row.stop_bits, parity: row.parity, flowControl: row.flow_control }), nodes: Object.freeze(nodes.map((node) => Object.freeze({ id: node.id, name: node.name, catalogKey: node.catalog_key, slaveId: node.slave_id, position: node.position }))), createdAt: row.created_at.toISOString(), updatedAt: row.updated_at.toISOString() })
   }
 }

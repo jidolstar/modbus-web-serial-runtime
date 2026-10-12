@@ -7,6 +7,7 @@ import { findErrorCause, OperationAbortedError, throwIfOperationAborted } from '
 import { STANDARD_MODBUS_BAUD_RATES } from '@modbus-manager/device-catalog-domain'
 
 const SERIAL_REOPEN_SETTLE_MS = 100 // baudrate 변경 후 USB-RS485와 RTU 무통신 구간을 안정화하는 대기시간. 예: 100ms
+const SCAN_REQUEST_INTERVAL_MS = 100 // 연속 Slave 요청이 RTU 프레임 간격을 침범하지 않도록 보장하는 대기시간. 예: 100ms
 export { STANDARD_MODBUS_BAUD_RATES }
 
 export enum CatalogScanStage {
@@ -92,6 +93,10 @@ export class CatalogAwareScanner {
         currentSerialConfig: target.serialConfig,
         currentSlaveId: target.slaveId,
       }))
+      const nextTarget = targets[index + 1]
+      const hasSameSerialConfig = nextTarget
+        && this.#serialConfigKey(nextTarget.serialConfig) === configKey
+      if (hasSameSerialConfig) await this.#waitForNextRequest(signal)
     }
 
     return Object.freeze(results)
@@ -149,6 +154,12 @@ export class CatalogAwareScanner {
     if (this.serialReopenSettleMs > 0) {
       await new Promise<void>((resolve) => globalThis.setTimeout(resolve, this.serialReopenSettleMs))
     }
+    throwIfOperationAborted(signal)
+  }
+
+  /** 같은 baudrate에서 다음 Slave ID를 요청하기 전에 100ms 간격을 보장한다. */
+  async #waitForNextRequest(signal?: AbortSignal): Promise<void> {
+    await new Promise<void>((resolve) => globalThis.setTimeout(resolve, SCAN_REQUEST_INTERVAL_MS))
     throwIfOperationAborted(signal)
   }
 }

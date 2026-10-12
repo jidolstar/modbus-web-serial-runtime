@@ -5,16 +5,68 @@ import { catalogApi, type CatalogDetail } from '../device-catalog/catalog-api'
 import type { AppRoute } from '../device-catalog/catalog-route'
 import { TestGroupApiError, testGroupApi, type TestGroup } from '../test-groups/test-group-api'
 import { TEST_GROUP_MAX_NODES } from '../application/test-group'
-interface EditableNode { name: string; catalogKey: string; catalogRevision: number; slaveId: number }
+import { showToast } from '../ui/toast'
+interface EditableNode { name: string; catalogKey: string; slaveId: number }
 const props = defineProps<{ readonly groupId?: number }>(); const emit = defineEmits<{ navigate: [route: AppRoute] }>()
 const catalogs = ref<readonly CatalogDetail[]>([]); const existing = ref<TestGroup | null>(null); const name = ref('새 테스트 그룹'); const baudRate = ref(9600); const nodes = reactive<EditableNode[]>([]); const error = ref<string | null>(null); const saving = ref(false)
 const baudOptions = computed(() => { const selected = nodes.map((node) => catalogs.value.find(({ catalogKey }) => catalogKey === node.catalogKey)).filter((item) => item !== undefined); if (!selected.length) return [9600]; return selected.map(({ definition }) => definition.profile.serial.supportedBaudRates).reduce((common, values) => common.filter((value) => values.includes(value))) })
-async function load(): Promise<void> { try { const summaries = (await catalogApi.list()).items.filter(({ enabled }) => enabled); catalogs.value = await Promise.all(summaries.map(({ catalogKey }) => catalogApi.get(catalogKey))); if (props.groupId) { existing.value = await testGroupApi.get(props.groupId); name.value = existing.value.name; baudRate.value = existing.value.serialConfig.baudRate; nodes.push(...existing.value.nodes.map(({ name: nodeName, catalogKey, catalogRevision, slaveId }) => ({ name: nodeName, catalogKey, catalogRevision, slaveId }))) } if (!nodes.length) addNode() } catch { error.value = '그룹 편집 정보를 불러오지 못했습니다.' } }
+async function load(): Promise<void> {
+  try {
+    const summaries = (await catalogApi.list()).items.filter(({ enabled }) => enabled)
+    catalogs.value = await Promise.all(summaries.map(({ catalogKey }) => catalogApi.get(catalogKey)))
+
+    if (props.groupId) {
+      existing.value = await testGroupApi.get(props.groupId)
+      name.value = existing.value.name
+      baudRate.value = existing.value.serialConfig.baudRate
+      nodes.push(...existing.value.nodes.map(({ name: nodeName, catalogKey, slaveId }) => ({ name: nodeName, catalogKey, slaveId })))
+    }
+
+    if (!nodes.length) addNode()
+  } catch {
+    error.value = '그룹 편집 정보를 불러오지 못했습니다.'
+  }
+}
 /** 사용자가 31번째 node를 만들지 못하게 UI와 API가 같은 상한을 적용한다. */
-function addNode(): void { const catalog = catalogs.value[0]; if (!catalog || nodes.length >= TEST_GROUP_MAX_NODES) return; nodes.push({ name: '', catalogKey: catalog.catalogKey, catalogRevision: catalog.revision, slaveId: catalog.definition.profile.slave.defaultId }); if (!baudOptions.value.includes(baudRate.value)) baudRate.value = baudOptions.value[0] ?? 9600 }
-function catalogChanged(node: EditableNode): void { const catalog = catalogs.value.find(({ catalogKey }) => catalogKey === node.catalogKey); if (!catalog) return; node.catalogRevision = catalog.revision; node.slaveId = catalog.definition.profile.slave.defaultId; if (!baudOptions.value.includes(baudRate.value)) baudRate.value = baudOptions.value[0] ?? catalog.definition.profile.serial.default.baudRate }
+function addNode(): void { const catalog = catalogs.value[0]; if (!catalog || nodes.length >= TEST_GROUP_MAX_NODES) return; nodes.push({ name: '', catalogKey: catalog.catalogKey, slaveId: catalog.definition.profile.slave.defaultId }); if (!baudOptions.value.includes(baudRate.value)) baudRate.value = baudOptions.value[0] ?? 9600 }
+function catalogChanged(node: EditableNode): void { const catalog = catalogs.value.find(({ catalogKey }) => catalogKey === node.catalogKey); if (!catalog) return; node.slaveId = catalog.definition.profile.slave.defaultId; if (!baudOptions.value.includes(baudRate.value)) baudRate.value = baudOptions.value[0] ?? catalog.definition.profile.serial.default.baudRate }
 function move(index: number, offset: number): void { const target = index + offset; if (target < 0 || target >= nodes.length) return; const [node] = nodes.splice(index, 1); nodes.splice(target, 0, node) }
-async function save(): Promise<void> { error.value = null; if (!nodes.length || nodes.length > TEST_GROUP_MAX_NODES || !baudOptions.value.includes(baudRate.value) || new Set(nodes.map(({ slaveId }) => slaveId)).size !== nodes.length) { error.value = `장비는 최대 ${TEST_GROUP_MAX_NODES}대까지 등록할 수 있습니다. 공통 baudrate와 중복되지 않는 Slave ID도 확인해 주세요.`; return } saving.value = true; const serialConfig: SerialConfig = { baudRate: baudRate.value, dataBits: 8, stopBits: 1, parity: SerialParity.None, flowControl: SerialFlowControl.None }; try { const input = { name: name.value, serialConfig, nodes }; const saved = existing.value ? await testGroupApi.update(existing.value, input) : await testGroupApi.create(input); emit('navigate', { page: 'test-group-run', groupId: saved.id }) } catch (caught) { error.value = caught instanceof TestGroupApiError && caught.code === 'TEST_GROUP_REVISION_CONFLICT' ? '다른 화면에서 그룹이 수정되었습니다. 새로고침한 뒤 다시 변경해 주세요.' : '그룹을 저장하지 못했습니다. Catalog revision과 입력 범위를 확인해 주세요.' } finally { saving.value = false } }
+async function save(): Promise<void> {
+  error.value = null
+  const hasInvalidNodes = !nodes.length
+    || nodes.length > TEST_GROUP_MAX_NODES
+    || !baudOptions.value.includes(baudRate.value)
+    || new Set(nodes.map(({ slaveId }) => slaveId)).size !== nodes.length
+  if (hasInvalidNodes) {
+    error.value = `장비는 최대 ${TEST_GROUP_MAX_NODES}대까지 등록할 수 있습니다. 공통 baudrate와 중복되지 않는 Slave ID도 확인해 주세요.`
+    showToast(`저장할 수 없습니다. ${error.value}`, 'error')
+    return
+  }
+
+  saving.value = true
+  const serialConfig: SerialConfig = {
+    baudRate: baudRate.value,
+    dataBits: 8,
+    stopBits: 1,
+    parity: SerialParity.None,
+    flowControl: SerialFlowControl.None,
+  }
+
+  try {
+    const input = { name: name.value, serialConfig, nodes }
+    const saved = existing.value
+      ? await testGroupApi.update(existing.value, input)
+      : await testGroupApi.create(input)
+    emit('navigate', { page: 'test-group-run', groupId: saved.id })
+  } catch (caught) {
+    error.value = caught instanceof TestGroupApiError && caught.code === 'TEST_GROUP_REVISION_CONFLICT'
+      ? '다른 화면에서 그룹이 수정되었습니다. 새로고침한 뒤 다시 변경해 주세요.'
+      : '그룹을 저장하지 못했습니다. Catalog 상태와 입력 범위를 확인해 주세요.'
+    showToast(`저장 실패: ${error.value}`, 'error')
+  } finally {
+    saving.value = false
+  }
+}
 onMounted(load)
 </script>
 <template>

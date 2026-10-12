@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useAuthSession } from './auth/use-auth-session'
+import ToastViewport from './ui/ToastViewport.vue'
 import DashboardView from './views/DashboardView.vue'
 import ErrorView from './views/ErrorView.vue'
 import LoadingView from './views/LoadingView.vue'
@@ -13,6 +14,7 @@ onMounted(bootstrap)
 </script>
 
 <template>
+  <ToastViewport />
   <LoadingView v-if="state.kind === 'loading'" />
   <SetupRequiredView
     v-else-if="state.kind === 'configuration-missing'"

@@ -6,7 +6,7 @@ const MAX_NAME_LENGTH = 100
 export const MAX_TEST_GROUP_NODES = 30
 const CATALOG_KEY_PATTERN = /^[a-z0-9][a-z0-9._-]{0,99}$/
 
-export interface TestGroupNodeInput { readonly name: string; readonly catalogKey: string; readonly catalogRevision: number; readonly slaveId: number }
+export interface TestGroupNodeInput { readonly name: string; readonly catalogKey: string; readonly slaveId: number }
 export interface TestGroupWriteInput { readonly name: string; readonly revision?: number; readonly serialConfig: SerialConfig; readonly nodes: readonly TestGroupNodeInput[] }
 
 function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null && !Array.isArray(value) }
@@ -42,13 +42,12 @@ export function parseTestGroupInput(value: unknown, requireRevision: boolean): T
   const nodes = body.nodes.map((candidate, index) => {
     const node = record(candidate); const path = `/nodes/${index}`
     if (!node) throw new TestGroupError('TEST_GROUP_INVALID_INPUT', 400, [path])
-    exactKeys(node, ['name', 'catalogKey', 'catalogRevision', 'slaveId'], path)
+    exactKeys(node, ['name', 'catalogKey', 'slaveId'], path)
     if (typeof node.catalogKey !== 'string' || !CATALOG_KEY_PATTERN.test(node.catalogKey)
-      || !Number.isInteger(node.catalogRevision) || Number(node.catalogRevision) < 1
       || !Number.isInteger(node.slaveId) || Number(node.slaveId) < 1 || Number(node.slaveId) > 247) {
       throw new TestGroupError('TEST_GROUP_INVALID_INPUT', 400, [path])
     }
-    return Object.freeze({ name: name(node.name, `${path}/name`), catalogKey: node.catalogKey, catalogRevision: Number(node.catalogRevision), slaveId: Number(node.slaveId) })
+    return Object.freeze({ name: name(node.name, `${path}/name`), catalogKey: node.catalogKey, slaveId: Number(node.slaveId) })
   })
   if (new Set(nodes.map(({ slaveId }) => slaveId)).size !== nodes.length) throw new TestGroupError('TEST_GROUP_INVALID_INPUT', 400, ['/nodes/slaveId'])
   const revision = body.revision

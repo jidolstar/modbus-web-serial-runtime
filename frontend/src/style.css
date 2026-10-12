@@ -47,6 +47,13 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px soli
 .help-tooltip-trigger:focus-visible { border-color: var(--brand-500); outline: 3px solid rgb(59 130 246 / 20%); outline-offset: 2px; }
 .help-tooltip-content { position: fixed; z-index: 1000; width: max-content; max-width: min(280px, calc(100vw - 24px)); padding: 10px 12px; border: 1px solid #334155; border-radius: 8px; color: white; background: #1e293b; box-shadow: 0 10px 30px rgb(15 23 42 / 24%); font-size: .75rem; font-weight: 500; line-height: 1.55; pointer-events: auto; }
 #app { min-height: 100vh; }
+.toast-viewport { position: fixed; z-index: 1100; top: 20px; right: 20px; display: flex; max-width: min(440px, calc(100vw - 32px)); align-items: flex-start; gap: 14px; padding: 14px 16px; border: 1px solid var(--slate-200); border-radius: 10px; color: var(--slate-800); background: white; box-shadow: 0 12px 32px rgb(15 23 42 / 20%); font-size: .84rem; font-weight: 600; line-height: 1.5; }
+.toast-error { border-color: #fca5a5; color: #991b1b; background: #fff7f7; }
+.toast-success { border-color: #86efac; color: #166534; background: #f0fdf4; }
+.toast-viewport button { flex: 0 0 auto; padding: 0 2px; border: 0; color: inherit; background: transparent; font-size: 1.2rem; line-height: 1; cursor: pointer; }
+.toast-enter-active, .toast-leave-active { transition: opacity .18s ease, transform .18s ease; }
+.toast-enter-from, .toast-leave-to { opacity: 0; transform: translateY(-8px); }
+@media (prefers-reduced-motion: reduce) { .toast-enter-active, .toast-leave-active { transition: none; } }
 .app-loading { display: grid; min-height: 100vh; place-items: center; color: var(--slate-500); background: var(--slate-100); }
 .app-loading-content { display: grid; min-width: 220px; place-items: center; gap: 10px; animation: app-loading-appear .2s ease-out both; }
 .app-loading-mark { display: grid; width: 44px; height: 44px; margin-bottom: 2px; place-items: center; border-radius: 11px; color: white; background: var(--brand-600); font-weight: 800; }

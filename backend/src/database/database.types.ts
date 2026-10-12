@@ -107,7 +107,6 @@ export interface TestGroupNodesTable {
   test_group_id: number
   name: string // node 표시 이름. 예: "온도 센서 1"
   catalog_id: number
-  catalog_revision: number
   slave_id: number
   position: number // 0부터 시작하는 실행 순서
   created_at: Generated<Date>

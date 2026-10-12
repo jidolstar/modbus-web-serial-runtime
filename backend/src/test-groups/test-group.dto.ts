@@ -9,14 +9,13 @@ export class TestGroupSerialDto {
 }
 export class TestGroupNodeWriteDto {
   @ApiProperty({ example: '온도 센서 1', maxLength: 100 }) name!: string
-  @ApiProperty({ example: 'example-temperature-sensor' }) catalogKey!: string
-  @ApiProperty({ example: 2, minimum: 1 }) catalogRevision!: number
+  @ApiProperty({ example: 'example-temperature-sensor', description: '현재 활성 Catalog 정의를 찾는 안정 key입니다.' }) catalogKey!: string
   @ApiProperty({ example: 1, minimum: 1, maximum: 247 }) slaveId!: number
 }
 export class TestGroupWriteDto {
   @ApiProperty({ example: '시험실 A 그룹', maxLength: 100 }) name!: string
   @ApiProperty({ type: TestGroupSerialDto }) serialConfig!: TestGroupSerialDto
-  @ApiProperty({ type: [TestGroupNodeWriteDto], minItems: 1, maxItems: 30, description: '한 RS485 bus에서 순차 측정할 node입니다. 1~30개만 허용합니다.' }) nodes!: TestGroupNodeWriteDto[]
+  @ApiProperty({ type: [TestGroupNodeWriteDto], minItems: 1, maxItems: 30, description: '한 RS485 bus에서 현재 Catalog 정의를 사용하는 node입니다. 1~30개만 허용합니다.' }) nodes!: TestGroupNodeWriteDto[]
 }
 export class TestGroupUpdateDto extends TestGroupWriteDto { @ApiProperty({ example: 1, minimum: 1 }) revision!: number }
 export class TestGroupNodeDto extends TestGroupNodeWriteDto { @ApiProperty({ example: 31 }) id!: number; @ApiProperty({ example: 0 }) position!: number }
