@@ -69,9 +69,60 @@ Copy-Item .env.sample .env
 docker\dev\run.bat
 ```
 
-`.env.sample`을 `.env`로 복사한 뒤 예제 값과 도메인을 실제 환경에 맞게 바꿉니다. `.env`는 Git에 포함하지 않습니다. `DATABASE_*`는 Compose 외부에서 운영하는 MySQL을 가리켜야 하며, Google OIDC callback URL은 Google 설정에 등록한 Backend 주소와 정확히 일치해야 합니다.
+`.env.sample`을 `.env`로 복사한 뒤 아래의 데이터베이스 및 앱 설정을 실제 환경에 맞게 바꿉니다. `.env`에는 비밀번호와 secret이 있으므로 Git에 커밋하지 않습니다. Docker Compose는 저장소 루트의 `.env`를 읽어 Backend에 전달하고, Frontend에는 `VITE_*` 공개 설정과 `CORS_ORIGIN`만 빌드 인자로 전달합니다.
 
-`CORS_ORIGIN`에는 Frontend의 공개 origin만 입력합니다(경로와 마지막 `/` 없이). 이 값은 인증 callback 검증, CORS, 그리고 HTTPS 배포의 canonical/Open Graph URL에 사용됩니다. `VITE_API_BASE_URL`은 브라우저가 접근하는 Backend API base URL이며 `/api`를 포함해야 합니다. `VITE_ALLOWED_HOSTS`에는 Vite 개발 서버에 접속할 호스트 이름을 지정합니다.
+### DB와 `.env` 준비
+
+MySQL 8.4 서버와 애플리케이션이 사용할 데이터베이스는 먼저 준비해야 합니다. 이 프로젝트는 MySQL 서버나 데이터베이스 자체를 만들지 않습니다. 새 데이터베이스는 테이블이 없는 빈 상태로 두면 Backend migration이 테이블을 생성하고 버전을 기록합니다. `docker/prod/run.sh`와 `restart.sh`는 배포 후 migration을 실행하며 Backend도 시작 시 미적용 migration을 적용합니다.
+
+MySQL 관리 계정으로 데이터베이스와 애플리케이션 계정을 준비하는 예시는 다음과 같습니다. 비밀번호는 임의의 강한 값으로 바꾸고, `'%'` 접속 host는 가능한 앱 서버의 실제 네트워크 범위로 제한합니다. MySQL 포트도 인터넷에 공개하지 말고 앱 서버에서만 접근 가능하게 설정합니다.
+
+```sql
+CREATE DATABASE IF NOT EXISTS modbus_manager
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_0900_ai_ci;
+
+CREATE USER 'modbus_app'@'%' IDENTIFIED BY 'replace_with_a_long_random_password';
+GRANT ALL PRIVILEGES ON modbus_manager.* TO 'modbus_app'@'%';
+```
+
+계정은 해당 데이터베이스 범위에서 앱의 읽기·쓰기와 migration의 테이블·인덱스 생성 및 변경을 할 수 있어야 합니다. 앱 테이블을 수동으로 만들지 마세요. 테이블을 미리 만든 DB에는 migration이 자동으로 적용·인식되지 않아 `table already exists` 오류가 날 수 있습니다. 이미 운영 중인 데이터가 있으면 백업한 뒤 현재 schema와 migration 이력을 확인하고 적용해야 합니다. 실행된 migration은 `kysely_migration` 이력 테이블에 기록됩니다.
+
+루트 `.env`에서 최소한 다음 값을 설정합니다. 도메인은 예시이므로 실제 Frontend/API 주소로 교체합니다.
+
+```dotenv
+NODE_ENV=production
+PORT=3000
+CORS_ORIGIN=https://app.example.com
+VITE_API_BASE_URL=https://api.example.com/api
+VITE_ALLOWED_HOSTS=app.example.com
+
+GOOGLE_OIDC_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_OIDC_CLIENT_SECRET=replace_with_secret
+GOOGLE_OIDC_CALLBACK_URL=https://api.example.com/api/auth/google/callback
+AUTH_ALLOWED_EMAILS=admin@example.com
+
+JWT_SECRET=replace_with_at_least_32_random_bytes
+AUTH_SESSION_TTL_SECONDS=28800
+AUTH_COOKIE_NAME=modbus_session
+
+DATABASE_HOST=mysql-8.4
+DATABASE_PORT=3306
+DATABASE_NAME=modbus_manager
+DATABASE_USER=modbus_app
+DATABASE_PASSWORD=replace_with_a_long_random_password
+DATABASE_SSL=false
+```
+
+- `DATABASE_HOST`는 Backend 컨테이너에서 접근 가능한 MySQL 주소입니다. 다른 컨테이너라면 `shared-net`에 연결하고 그 네트워크에서 해석되는 컨테이너 이름을 사용합니다. `localhost`는 Backend 컨테이너 자신을 가리킵니다.
+- `CORS_ORIGIN`은 Frontend의 공개 origin으로, 경로와 마지막 `/` 없이 입력합니다. 인증 redirect, CORS, HTTPS canonical/Open Graph 주소에 사용됩니다. 운영에서는 HTTPS여야 합니다.
+- `VITE_API_BASE_URL`은 브라우저가 접근하는 API base URL이며 `/api`를 포함합니다. `VITE_ALLOWED_HOSTS`는 Vite 개발 서버 허용 host 목록입니다. 두 `VITE_*` 값은 브라우저에 공개되므로 secret을 넣지 않습니다.
+- Google 로그인을 사용하려면 OIDC client ID/secret, callback URL, 허용 이메일 목록을 설정하고 callback URL을 Google 앱 설정에도 동일하게 등록합니다. `JWT_SECRET`은 최소 32바이트의 무작위 secret으로 설정합니다. `.env.sample`의 예시 값을 운영에서 그대로 사용하지 않습니다.
+- `AUTH_SESSION_TTL_SECONDS`는 300~86400초 범위입니다. `AUTH_COOKIE_NAME`은 세션 cookie 이름입니다.
+- `CATALOG_UPLOAD_ROOT`와 `CATALOG_FILE_MAX_BYTES`, `CATALOG_THUMBNAIL_MAX_BYTES`는 업로드 위치와 크기 제한이며 생략하면 `.env.sample`의 기본값을 사용합니다. Compose named volume은 기본 경로를 보존합니다.
+- `GEMINI_API_KEY`는 선택 설정이며 Backend에서만 사용합니다. AI Catalog 기능이 필요할 때 실제 key를 `.env`에 넣고 Frontend 변수에는 넣지 않습니다. `GEMINI_CATALOG_MODEL`, `GEMINI_CATALOG_TIMEOUT_MS`, `GEMINI_AUDIT_RETENTION_DAYS`에는 기본값이 있습니다.
+
+`NODE_ENV`는 `.env.sample`에서 개발 기본값으로 제공됩니다. 운영 Compose는 Backend의 `NODE_ENV`를 `production`으로 지정하지만, 운영 환경 문서와 설정 일관성을 위해 `.env`에도 `production`을 기록하는 것을 권장합니다. 전체 환경변수와 기본값은 [`.env.sample`](.env.sample)을 기준으로 확인합니다.
 
 개발 Compose는 호스트 포트를 공개하지 않습니다. `run.bat`이 외부 Docker network `shared-net`을 준비합니다. Frontend와 Backend 컨테이너는 해당 네트워크에 연결된 MySQL 및 reverse proxy에서 다음 주소로 접근할 수 있습니다.
 
