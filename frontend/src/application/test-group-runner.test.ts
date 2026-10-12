@@ -44,7 +44,7 @@ describe('TestGroupRunner', () => {
     expect(runner.snapshot.results.every(({ status }) => status === 'cancelled')).toBe(true)
   })
 
-  it('자동 측정은 node 사이에 RTU t3.5만 두고 전체 순회 뒤 선택 간격을 기다린다', async () => {
+  it('자동 측정은 node 사이에 RTU t3.5의 4배를 두고 순회 뒤 선택 간격을 기다린다', async () => {
     vi.useFakeTimers()
     try {
       const execute = vi.fn().mockResolvedValue({ recipeId: 'read', status: RecipeExecutionStatus.Succeeded, steps: [], outputs: {}, context: {} })
@@ -54,7 +54,7 @@ describe('TestGroupRunner', () => {
       expect(execute).toHaveBeenCalledTimes(1)
       expect(execute.mock.calls[0][2]).toEqual({ deviceId: 1 })
 
-      await vi.advanceTimersByTimeAsync(3)
+      await vi.advanceTimersByTimeAsync(15)
       expect(execute).toHaveBeenCalledTimes(1)
       await vi.advanceTimersByTimeAsync(1)
       expect(execute).toHaveBeenCalledTimes(2)
@@ -82,7 +82,7 @@ describe('TestGroupRunner', () => {
       const runner = new TestGroupRunner(new MockRunner(execute))
       const automaticRun = runner.runAutomatically({ group, catalogs: { 'cwt-th04s': bundle } }, 1_000)
       await vi.waitFor(() => expect(runner.snapshot.results[0]?.status).toBe('timeout'))
-      await vi.advanceTimersByTimeAsync(4)
+      await vi.advanceTimersByTimeAsync(16)
       await vi.waitFor(() => expect(execute).toHaveBeenCalledTimes(2))
       expect(runner.snapshot.results[1]?.status).toBe('succeeded')
       runner.cancel()
@@ -107,7 +107,7 @@ describe('TestGroupRunner', () => {
       expect(execute).toHaveBeenCalledTimes(1)
       resolveFirst(succeeded)
       await Promise.resolve()
-      await vi.advanceTimersByTimeAsync(3)
+      await vi.advanceTimersByTimeAsync(15)
       expect(execute).toHaveBeenCalledTimes(1)
       await vi.advanceTimersByTimeAsync(1)
       await vi.waitFor(() => expect(execute).toHaveBeenCalledTimes(2))
