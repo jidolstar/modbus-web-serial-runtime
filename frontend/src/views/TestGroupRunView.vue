@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { DeviceActionRunner } from '../application/device-action-runner'
 import { TEST_GROUP_AUTO_INTERVALS_MS, TestGroupRunner, type TestGroupAutoIntervalMs, type TestGroupNodeResult, type TestGroupRunSnapshot } from '../application/test-group-runner'
+import { createAutomaticMeasurementCycle, MAX_AUTOMATIC_MEASUREMENT_CYCLES, TestGroupMeasurementHistory } from '../application/test-group-measurement-history'
 import { testBusSession } from '../application/test-bus-session'
 import { findErrorCause } from '../application/operation-errors'
 import { RecipeKind, RecipeStepType, STANDARD_DEVICE_ID_PARAMETER, type Recipe, type RecipeParameter } from '../device-catalog/recipe.types'
@@ -10,6 +11,7 @@ import { ModbusExceptionError, ModbusTimeoutError } from '../modbus/modbus-error
 import { SerialConnectionState } from '../serial/serial-connection-state'
 import { SerialDisconnectedError } from '../serial/serial-errors'
 import { testGroupApi, type TestGroupNode, type TestGroupRuntimeSnapshot } from '../test-groups/test-group-api'
+import { deviceMeasurementCsvFileName, formatDeviceMeasurementCsv } from '../features/test-groups/export-test-group-csv'
 
 const props = defineProps<{ readonly groupId: number }>()
 const emit = defineEmits<{ navigate: [route: AppRoute] }>()
@@ -25,6 +27,8 @@ const error = ref<string | null>(null)
 const operationBusy = ref(false)
 const automaticIntervalMs = ref<TestGroupAutoIntervalMs>(3_000)
 const automaticSessionActive = ref(false)
+const automaticHistoryCount = ref(0)
+const automaticHistory = new TestGroupMeasurementHistory()
 
 const runner = new TestGroupRunner(testBusSession.recipeExecutor)
 const unsubscribe = runner.subscribe((snapshot) => { runState.value = snapshot })
@@ -97,10 +101,23 @@ async function runNode(nodeId: number): Promise<void> { if (runtime.value && con
 
 /** 자동 실행이 끝날 때까지 같은 Promise가 operation lock을 소유하며 오류는 화면 메시지로 제한한다. */
 async function startAutomatic(): Promise<void> {
-  if (!runtime.value || !connected.value || runState.value.running || operationBusy.value) return
+  const snapshot = runtime.value
+  if (!snapshot || !connected.value || runState.value.running || operationBusy.value) return
   error.value = null
+  automaticHistory.reset()
+  automaticHistoryCount.value = 0
   automaticSessionActive.value = true
-  try { await runner.runAutomatically(runtime.value, automaticIntervalMs.value) }
+  try {
+    await runner.runAutomatically(snapshot, automaticIntervalMs.value, (cycleResult) => {
+      const record = createAutomaticMeasurementCycle(
+        snapshot,
+        cycleResult.cycle,
+        cycleResult.startedAt,
+        cycleResult.results,
+      )
+      if (automaticHistory.append(record)) automaticHistoryCount.value = automaticHistory.count
+    })
+  }
   catch { error.value = '자동 순차 측정을 시작하지 못했습니다.' }
   finally { automaticSessionActive.value = false }
 }
@@ -116,6 +133,23 @@ function resultFor(nodeId: number): TestGroupNodeResult | undefined { return run
 function statusLabel(result: TestGroupNodeResult | undefined): string { return result ? STATUS_LABELS[result.status] : '대기' }
 function formatTime(value: Date | null | undefined): string { return value ? new Intl.DateTimeFormat('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(value) : '' }
 function outputEntries(result: TestGroupNodeResult | undefined) { return Object.entries(result?.outputs ?? {}) }
+
+/** 저장된 자동 측정 cycle에서 선택한 장비만 CSV로 내려받는다. */
+function downloadNodeCsv(node: TestGroupNode): void {
+  const rows = automaticHistory.forNode(node.id)
+  const device = rows[0]?.device
+  if (!device) return
+
+  const csv = formatDeviceMeasurementCsv(rows)
+  const objectUrl = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+  const anchor = document.createElement('a')
+  anchor.href = objectUrl
+  anchor.download = deviceMeasurementCsvFileName(device)
+  document.body.append(anchor)
+  anchor.click()
+  anchor.remove()
+  globalThis.setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
+}
 
 /** 측정에 성공한 현재 연결의 node만 native modal dialog로 열어 화면 중앙과 focus trap을 보장한다. */
 async function openWrite(node: TestGroupNode): Promise<void> {
@@ -182,9 +216,10 @@ onBeforeUnmount(() => { runner.cancel(); unsubscribe(); unsubscribeConnection();
   <p v-if="error" class="notice error">{{ error }}</p><p v-if="writeMessage" class="notice" role="status">{{ writeMessage }}</p>
   <section v-if="runtime" class="surface-card group-run-panel">
     <div class="group-run-toolbar">
-      <div><strong>{{ automaticRunning ? `자동 측정 cycle ${runState.cycle} · ${runState.completed}/${runState.total}` : `전체 진행 ${runState.completed}/${runState.total || runtime.group.nodes.length}` }}</strong><progress :value="progress" max="100" /><small class="group-run-progress-message" aria-live="polite">{{ progressMessage }}</small></div>
+      <div><strong>{{ automaticRunning ? `자동 측정 cycle ${runState.cycle} · ${runState.completed}/${runState.total}` : `전체 진행 ${runState.completed}/${runState.total || runtime.group.nodes.length}` }}</strong><progress :value="progress" max="100" /><small>자동 측정 저장: {{ automaticHistoryCount.toLocaleString() }} / {{ MAX_AUTOMATIC_MEASUREMENT_CYCLES.toLocaleString() }} cycle</small><small class="group-run-progress-message" aria-live="polite">{{ progressMessage }}</small></div>
       <div class="group-run-controls"><label>전체 순회 후 대기<select v-model.number="automaticIntervalMs" :disabled="runState.running || operationBusy"><option v-for="interval in TEST_GROUP_AUTO_INTERVALS_MS" :key="interval" :value="interval">{{ interval / 1000 }}초</option></select></label><button v-if="automaticRunning" class="button button-secondary" type="button" :disabled="runState.mode === 'stopping'" @click="runner.cancel()">{{ runState.mode === 'stopping' ? '중지 중…' : '자동 측정 중지' }}</button><button v-else-if="runState.running" class="button button-secondary" type="button" :disabled="runState.mode === 'stopping'" @click="runner.cancel()">{{ runState.mode === 'stopping' ? '취소 중…' : '전체 취소' }}</button><button v-else class="button button-primary" type="button" :disabled="!connected || operationBusy" @click="startAutomatic">자동 측정 시작</button><button class="button button-ghost" type="button" :disabled="!connected || runState.running || operationBusy" @click="runAll">전체 순차 측정</button></div>
     </div>
+    <p v-if="automaticHistoryCount >= MAX_AUTOMATIC_MEASUREMENT_CYCLES && !automaticRunning" class="notice success">최대 10,000 cycle에 도달해 자동 측정을 종료했습니다.</p>
     <p v-if="resultsFromPreviousConnection" class="notice warning">아래 값은 이전 연결의 결과입니다. 다시 연결해 측정하기 전에는 쓰기 작업에 사용할 수 없습니다.</p>
     <div class="group-run-list" role="table" aria-label="테스트 node 실행 결과">
       <div class="group-run-head" role="row"><span>순서</span><span>테스트 장비</span><span>통신 대상</span><span>상태와 최근 결과</span><span>동작</span></div>
@@ -193,7 +228,7 @@ onBeforeUnmount(() => { runner.cancel(); unsubscribe(); unsubscribeConnection();
         <div><strong>{{ node.name }}</strong><small>{{ node.catalogKey }}</small></div>
         <div><strong>Slave ID {{ node.slaveId }}</strong><small>{{ runtime.group.serialConfig.baudRate.toLocaleString() }} baud</small></div>
         <div class="group-run-result"><div><span class="status-pill" :class="resultFor(node.id)?.status === 'succeeded' ? 'success' : resultFor(node.id)?.status === 'running' ? 'progress' : resultFor(node.id) ? 'warning' : 'muted'">{{ statusLabel(resultFor(node.id)) }}</span><small v-if="resultFor(node.id)?.finishedAt">{{ formatTime(resultFor(node.id)?.finishedAt) }} · cycle {{ resultFor(node.id)?.cycle }}</small></div><p v-if="resultFor(node.id)?.message">{{ resultFor(node.id)?.message }}</p><ul v-else-if="outputEntries(resultFor(node.id)).length" class="group-run-outputs"><li v-for="([name, output]) in outputEntries(resultFor(node.id))" :key="name"><span>{{ name }}</span><strong>{{ output.display.text }}{{ output.display.unit ? ` ${output.display.unit}` : '' }}</strong></li></ul><p v-else-if="resultFor(node.id)?.status === 'succeeded'">표시할 측정값이 없습니다.</p></div>
-        <div class="inline-actions"><button class="button button-ghost button-small" type="button" :disabled="!connected || runState.running || operationBusy" @click="runNode(node.id)">재측정</button><button class="button button-ghost button-small" type="button" :disabled="!connected || runState.running || operationBusy || resultsFromPreviousConnection || resultFor(node.id)?.status !== 'succeeded'" @click="openWrite(node)">쓰기 작업</button></div>
+        <div class="inline-actions"><button class="button button-ghost button-small" type="button" :disabled="!connected || runState.running || operationBusy" @click="runNode(node.id)">재측정</button><button class="button button-ghost button-small" type="button" :disabled="!connected || runState.running || operationBusy || resultsFromPreviousConnection || resultFor(node.id)?.status !== 'succeeded'" @click="openWrite(node)">쓰기 작업</button><button class="button button-ghost button-small" type="button" :disabled="automaticHistoryCount === 0" @click="downloadNodeCsv(node)">CSV 저장</button></div>
       </article>
     </div>
   </section>

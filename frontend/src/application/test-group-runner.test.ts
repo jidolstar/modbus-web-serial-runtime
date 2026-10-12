@@ -9,6 +9,7 @@ import { SerialDisconnectedError } from '../serial/serial-errors'
 import { SerialDisconnectReason } from '../serial/serial-connection-state'
 import { RecipeAbortedError } from '../recipe-engine/recipe-execution-errors'
 import { ModbusTimeoutError } from '../modbus/modbus-errors'
+import { MAX_AUTOMATIC_MEASUREMENT_CYCLES } from './test-group-measurement-history'
 
 const bundle = new DeviceProfileValidator().validateCatalogBundle(catalog, 'fixture')
 const group: TestGroup = { id: 1, name: '그룹', revision: 1, serialConfig: { baudRate: 9600, dataBits: 8, stopBits: 1, parity: SerialParity.None, flowControl: SerialFlowControl.None }, nodes: [{ id: 1, name: 'A', catalogKey: 'cwt-th04s', slaveId: 1, position: 0 }, { id: 2, name: 'B', catalogKey: 'cwt-th04s', slaveId: 2, position: 1 }], createdAt: '', updatedAt: '' }
@@ -126,5 +127,47 @@ describe('TestGroupRunner', () => {
     expect(execute).toHaveBeenCalledTimes(1)
     expect(runner.snapshot.results.map(({ status }) => status)).toEqual(['disconnected', 'cancelled'])
     expect(runner.snapshot.mode).toBe('idle')
+  })
+
+  it('자동 측정 중지 시 부분 cycle을 terminal node 결과와 함께 한 번 전달한다', async () => {
+    let cancel = (): void => undefined
+    const execute = vi.fn(async () => {
+      cancel()
+      return { recipeId: 'read', status: RecipeExecutionStatus.Succeeded, steps: [], outputs: {}, context: {} }
+    })
+    const runner = new TestGroupRunner(new MockRunner(execute))
+    cancel = () => runner.cancel()
+    const completedCycles: Array<{ cycle: number; statuses: string[] }> = []
+
+    await runner.runAutomatically({ group, catalogs: { 'cwt-th04s': bundle } }, 1_000, ({ cycle, results }) => {
+      completedCycles.push({ cycle, statuses: results.map(({ status }) => status) })
+    })
+
+    expect(completedCycles).toEqual([{ cycle: 1, statuses: ['succeeded', 'cancelled'] }])
+    expect(runner.snapshot.mode).toBe('idle')
+  })
+
+  it('10,000번째 cycle을 저장하고 다음 cycle을 시작하지 않는다', async () => {
+    vi.useFakeTimers()
+    try {
+      const singleNodeGroup = { ...group, nodes: [group.nodes[0]] }
+      const execute = vi.fn().mockResolvedValue({ recipeId: 'read', status: RecipeExecutionStatus.Succeeded, steps: [], outputs: {}, context: {} })
+      const runner = new TestGroupRunner(new MockRunner(execute))
+      let savedCycles = 0
+      const automaticRun = runner.runAutomatically({ group: singleNodeGroup, catalogs: { 'cwt-th04s': bundle } }, 1_000, ({ cycle }) => {
+        savedCycles = cycle
+      })
+
+      await vi.advanceTimersByTimeAsync(MAX_AUTOMATIC_MEASUREMENT_CYCLES * 1_000)
+      await automaticRun
+
+      expect(savedCycles).toBe(MAX_AUTOMATIC_MEASUREMENT_CYCLES)
+      expect(execute).toHaveBeenCalledTimes(MAX_AUTOMATIC_MEASUREMENT_CYCLES)
+      expect(runner.snapshot.cycle).toBe(MAX_AUTOMATIC_MEASUREMENT_CYCLES)
+      expect(runner.snapshot.mode).toBe('idle')
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

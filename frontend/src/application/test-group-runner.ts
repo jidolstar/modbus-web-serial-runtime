@@ -2,26 +2,18 @@ import { STANDARD_DEVICE_ID_PARAMETER } from '../device-catalog/recipe.types'
 import { ModbusExceptionError, ModbusTimeoutError } from '../modbus/modbus-errors'
 import { modbusRtuInterFrameDelayMs } from '../modbus/rtu-timing'
 import { RecipeAbortedError } from '../recipe-engine/recipe-execution-errors'
-import type { RecipeNamedOutput, RecipeRunner } from '../recipe-engine/recipe-execution.types'
+import type { RecipeRunner } from '../recipe-engine/recipe-execution.types'
 import { SerialDisconnectedError } from '../serial/serial-errors'
 import { findErrorCause } from './operation-errors'
 import type { TestGroupNode, TestGroupRuntimeSnapshot } from './test-group'
+import { MAX_AUTOMATIC_MEASUREMENT_CYCLES } from './test-group-measurement-history'
+import type { TestGroupNodeResult, TestGroupNodeStatus } from './test-group-run-result'
+
+export type { TestGroupNodeResult, TestGroupNodeStatus } from './test-group-run-result'
 
 export const TEST_GROUP_AUTO_INTERVALS_MS = Object.freeze([1_000, 3_000, 5_000, 10_000, 30_000, 60_000] as const)
 export type TestGroupAutoIntervalMs = typeof TEST_GROUP_AUTO_INTERVALS_MS[number]
 export type TestGroupRunMode = 'idle' | 'manual-all' | 'manual-node' | 'automatic' | 'stopping'
-export type TestGroupNodeStatus = 'waiting' | 'running' | 'succeeded' | 'timeout' | 'modbus-exception' | 'recipe-error' | 'disconnected' | 'cancelled'
-
-export interface TestGroupNodeResult {
-  readonly nodeId: number
-  readonly status: TestGroupNodeStatus
-  readonly outputs: Readonly<Record<string, RecipeNamedOutput>>
-  readonly startedAt: Date | null
-  readonly finishedAt: Date | null
-  readonly cycle: number | null
-  readonly message?: string
-}
-
 export interface TestGroupRunSnapshot {
   readonly mode: TestGroupRunMode
   readonly running: boolean
@@ -32,6 +24,15 @@ export interface TestGroupRunSnapshot {
   readonly nextRunAt: Date | null
   readonly results: readonly TestGroupNodeResult[]
 }
+
+export interface TestGroupAutomaticCycleResult {
+  readonly cycle: number // 현재 실행에서 1부터 시작하는 cycle 번호
+  readonly startedAt: Date // 이 cycle의 첫 node 요청 직전 시각
+  readonly results: ReadonlyArray<TestGroupNodeResult> // 중지된 경우 미실행 node도 cancelled로 확정한다.
+}
+
+/** 자동 측정 cycle이 terminal 결과를 얻었을 때 이력 수집기에서 호출한다. */
+export type TestGroupAutomaticCycleListener = (cycle: TestGroupAutomaticCycleResult) => void
 
 const EMPTY_SNAPSHOT: TestGroupRunSnapshot = Object.freeze({ mode: 'idle', running: false, completed: 0, total: 0, cycle: 0, currentNodeId: null, nextRunAt: null, results: Object.freeze([]) })
 
@@ -93,9 +94,14 @@ export class TestGroupRunner {
 
   /**
    * 자동 측정 시작 버튼에서 호출해 node 완료와 다음 요청 사이에 선택한 간격을 둔다.
+   * cycle 결과 callback은 완료 또는 부분 중지된 cycle마다 한 번 호출하며 10,000 cycle 뒤에는 다음 순회를 예약하지 않는다.
    * setInterval을 사용하지 않으므로 느린 응답과 timeout이 있어도 Modbus 요청이 서로 겹치지 않는다.
    */
-  public async runAutomatically(snapshot: TestGroupRuntimeSnapshot, intervalMs: TestGroupAutoIntervalMs): Promise<void> {
+  public async runAutomatically(
+    snapshot: TestGroupRuntimeSnapshot,
+    intervalMs: TestGroupAutoIntervalMs,
+    onCycleComplete?: TestGroupAutomaticCycleListener,
+  ): Promise<void> {
     if (!TEST_GROUP_AUTO_INTERVALS_MS.includes(intervalMs)) throw new Error('지원하지 않는 자동 측정 간격입니다.')
     const controller = this.beginOperation()
     const results = this.waitingResults(snapshot)
@@ -104,21 +110,42 @@ export class TestGroupRunner {
     const interFrameDelayMs = modbusRtuInterFrameDelayMs(snapshot.group.serialConfig)
     this.update('automatic', completed, results.length, cycle, null, null, results)
     try {
-      while (!controller.signal.aborted) {
-        for (const [index, node] of snapshot.group.nodes.entries()) {
-          if (controller.signal.aborted) break
+      while (!controller.signal.aborted && cycle <= MAX_AUTOMATIC_MEASUREMENT_CYCLES) {
+        const startedAt = new Date()
+        let stopAfterCycle = false
+        for (let index = 0; index < snapshot.group.nodes.length; index += 1) {
+          const node = snapshot.group.nodes[index]
+          if (controller.signal.aborted) {
+            this.cancelRemaining(snapshot, results, index, cycle, '사용자가 중지해 실행하지 않았습니다.')
+            break
+          }
           results[index] = await this.executeNode(snapshot, node, results[index], controller.signal, cycle)
           completed = index + 1
           this.update('automatic', completed, results.length, cycle, null, null, results)
-          if (results[index].status === 'disconnected') { this.cancelRemaining(snapshot, results, index + 1, cycle); return }
-          if (index < snapshot.group.nodes.length - 1 && !await this.wait(interFrameDelayMs, controller.signal)) break
+          if (results[index].status === 'disconnected') {
+            this.cancelRemaining(snapshot, results, index + 1, cycle)
+            stopAfterCycle = true
+            break
+          }
+          if (index < snapshot.group.nodes.length - 1 && !await this.wait(interFrameDelayMs, controller.signal)) {
+            this.cancelRemaining(snapshot, results, index + 1, cycle, '사용자가 중지해 실행하지 않았습니다.')
+            stopAfterCycle = true
+            break
+          }
         }
+
+        onCycleComplete?.(Object.freeze({ cycle, startedAt, results: Object.freeze([...results]) }))
+        if (controller.signal.aborted || stopAfterCycle || cycle === MAX_AUTOMATIC_MEASUREMENT_CYCLES) break
+
         if (!controller.signal.aborted) {
           const nextRunAt = new Date(Date.now() + intervalMs)
           this.update('automatic', completed, results.length, cycle, null, nextRunAt, results)
           if (!await this.wait(intervalMs, controller.signal)) break
           cycle += 1
           completed = 0
+          for (let index = 0; index < results.length; index += 1) {
+            results[index] = this.waitingResult(snapshot.group.nodes[index].id)
+          }
           this.update('automatic', completed, results.length, cycle, null, null, results)
         }
       }
@@ -171,8 +198,16 @@ export class TestGroupRunner {
   private waitingResult(nodeId: number): TestGroupNodeResult { return Object.freeze({ nodeId, status: 'waiting', outputs: Object.freeze({}), startedAt: null, finishedAt: null, cycle: null }) }
   private replaceResult(results: readonly TestGroupNodeResult[], replacement: TestGroupNodeResult): TestGroupNodeResult[] { return results.map((result) => result.nodeId === replacement.nodeId ? replacement : result) }
 
-  private cancelRemaining(snapshot: TestGroupRuntimeSnapshot, results: TestGroupNodeResult[], startIndex: number, cycle: number): void {
-    for (let index = startIndex; index < results.length; index += 1) results[index] = this.failure(snapshot.group.nodes[index].id, 'cancelled', 'Serial 연결이 종료되어 실행하지 않았습니다.', cycle)
+  private cancelRemaining(
+    snapshot: TestGroupRuntimeSnapshot,
+    results: TestGroupNodeResult[],
+    startIndex: number,
+    cycle: number,
+    message = 'Serial 연결이 종료되어 실행하지 않았습니다.',
+  ): void {
+    for (let index = startIndex; index < results.length; index += 1) {
+      results[index] = this.failure(snapshot.group.nodes[index].id, 'cancelled', message, cycle)
+    }
   }
 
   /** AbortSignal을 timer와 연결해 자동 중지·연결 해제 시 다음 node가 시작되지 않게 한다. */
