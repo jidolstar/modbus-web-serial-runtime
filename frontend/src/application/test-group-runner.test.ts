@@ -129,7 +129,7 @@ describe('TestGroupRunner', () => {
     expect(runner.snapshot.mode).toBe('idle')
   })
 
-  it('자동 측정 중지 시 부분 cycle을 terminal node 결과와 함께 한 번 전달한다', async () => {
+  it('자동 측정 중지 시 현재 node와 남은 node를 취소 처리해 한 번 전달한다', async () => {
     let cancel = (): void => undefined
     const execute = vi.fn(async () => {
       cancel()
@@ -143,8 +143,27 @@ describe('TestGroupRunner', () => {
       completedCycles.push({ cycle, statuses: results.map(({ status }) => status) })
     })
 
-    expect(completedCycles).toEqual([{ cycle: 1, statuses: ['succeeded', 'cancelled'] }])
+    expect(completedCycles).toEqual([{ cycle: 1, statuses: ['cancelled', 'cancelled'] }])
     expect(runner.snapshot.mode).toBe('idle')
+  })
+
+  it('자동 측정 중인 cycle은 장비 응답이 끝나기 전 중지 즉시 부분 이력으로 전달한다', async () => {
+    let resolveExecution!: (result: RecipeExecutionResult) => void
+    const execute = vi.fn(() => new Promise<RecipeExecutionResult>((resolve) => { resolveExecution = resolve }))
+    const runner = new TestGroupRunner(new MockRunner(execute))
+    const completedCycles: Array<{ cycle: number; statuses: string[] }> = []
+    const automaticRun = runner.runAutomatically({ group, catalogs: { 'cwt-th04s': bundle } }, 1_000, ({ cycle, results }) => {
+      completedCycles.push({ cycle, statuses: results.map(({ status }) => status) })
+    })
+
+    await Promise.resolve()
+    expect(execute).toHaveBeenCalledTimes(1)
+    runner.cancel()
+
+    expect(completedCycles).toEqual([{ cycle: 1, statuses: ['cancelled', 'cancelled'] }])
+    resolveExecution({ recipeId: 'read', status: RecipeExecutionStatus.Succeeded, steps: [], outputs: {}, context: {} })
+    await automaticRun
+    expect(completedCycles).toHaveLength(1)
   })
 
   it('10,000번째 cycle을 저장하고 다음 cycle을 시작하지 않는다', async () => {

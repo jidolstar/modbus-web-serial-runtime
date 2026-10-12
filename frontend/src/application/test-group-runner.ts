@@ -34,6 +34,14 @@ export interface TestGroupAutomaticCycleResult {
 /** 자동 측정 cycle이 terminal 결과를 얻었을 때 이력 수집기에서 호출한다. */
 export type TestGroupAutomaticCycleListener = (cycle: TestGroupAutomaticCycleResult) => void
 
+interface ActiveAutomaticCycle {
+  readonly cycle: number
+  readonly startedAt: Date
+  readonly results: TestGroupNodeResult[]
+  readonly listener?: TestGroupAutomaticCycleListener
+  finalized: boolean
+}
+
 const EMPTY_SNAPSHOT: TestGroupRunSnapshot = Object.freeze({ mode: 'idle', running: false, completed: 0, total: 0, cycle: 0, currentNodeId: null, nextRunAt: null, results: Object.freeze([]) })
 
 /**
@@ -42,6 +50,7 @@ const EMPTY_SNAPSHOT: TestGroupRunSnapshot = Object.freeze({ mode: 'idle', runni
  */
 export class TestGroupRunner {
   #controller: AbortController | null = null
+  #activeAutomaticCycle: ActiveAutomaticCycle | null = null
   #snapshot: TestGroupRunSnapshot = EMPTY_SNAPSHOT
   readonly #listeners = new Set<(snapshot: TestGroupRunSnapshot) => void>()
 
@@ -112,6 +121,8 @@ export class TestGroupRunner {
     try {
       while (!controller.signal.aborted && cycle <= MAX_AUTOMATIC_MEASUREMENT_CYCLES) {
         const startedAt = new Date()
+        const activeCycle: ActiveAutomaticCycle = { cycle, startedAt, results, listener: onCycleComplete, finalized: false }
+        this.#activeAutomaticCycle = activeCycle
         let stopAfterCycle = false
         for (let index = 0; index < snapshot.group.nodes.length; index += 1) {
           const node = snapshot.group.nodes[index]
@@ -134,7 +145,8 @@ export class TestGroupRunner {
           }
         }
 
-        onCycleComplete?.(Object.freeze({ cycle, startedAt, results: Object.freeze([...results]) }))
+        this.finalizeAutomaticCycle(activeCycle)
+        if (this.#activeAutomaticCycle === activeCycle) this.#activeAutomaticCycle = null
         if (controller.signal.aborted || stopAfterCycle || cycle === MAX_AUTOMATIC_MEASUREMENT_CYCLES) break
 
         if (!controller.signal.aborted) {
@@ -159,12 +171,34 @@ export class TestGroupRunner {
     if (!this.#controller) return
     this.update('stopping', this.#snapshot.completed, this.#snapshot.total, this.#snapshot.cycle, this.#snapshot.currentNodeId, null, this.#snapshot.results)
     this.#controller.abort('사용자가 Group 실행을 취소했습니다.')
+    this.finalizeActiveAutomaticCycle()
   }
 
   private beginOperation(): AbortController {
     if (this.#controller) throw new Error('테스트 그룹 작업이 이미 실행 중입니다.')
     this.#controller = new AbortController()
     return this.#controller
+  }
+
+  /** 중지 요청 즉시 진행 중 cycle을 부분 결과로 확정해 CSV로 내려받을 수 있게 한다. */
+  private finalizeActiveAutomaticCycle(): void {
+    if (this.#activeAutomaticCycle) this.finalizeAutomaticCycle(this.#activeAutomaticCycle)
+  }
+
+  /** 완료된 node는 보존하고 아직 대기·실행 중인 node만 취소 결과로 채워 한 번만 전달한다. */
+  private finalizeAutomaticCycle(activeCycle: ActiveAutomaticCycle): void {
+    if (activeCycle.finalized) return
+    activeCycle.finalized = true
+    const results = activeCycle.results.map((result) => (
+      result.status === 'waiting' || result.status === 'running'
+        ? this.failure(result.nodeId, 'cancelled', '사용자가 중지해 실행하지 않았습니다.', activeCycle.cycle)
+        : result
+    ))
+    activeCycle.listener?.(Object.freeze({
+      cycle: activeCycle.cycle,
+      startedAt: activeCycle.startedAt,
+      results: Object.freeze(results),
+    }))
   }
 
   private async executeNode(snapshot: TestGroupRuntimeSnapshot, node: TestGroupNode, previous: TestGroupNodeResult, signal: AbortSignal, cycle: number): Promise<TestGroupNodeResult> {
