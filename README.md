@@ -1,5 +1,7 @@
 # Modbus Studio
 
+![Modbus Studio 홈 화면](_images/modbus-studio-home.png)
+
 Modbus Studio는 브라우저에서 Modbus RTU 장비를 정의하고 연결해 실행하는 작업 공간입니다. 관리자는 장비 Catalog의 Profile과 Recipe를 관리하고, 사용자는 지원되는 브라우저에서 Web Serial로 RS485 장비를 탐색·측정·설정합니다.
 
 **개발자: Ji Yong ho**
@@ -7,6 +9,40 @@ Modbus Studio는 브라우저에서 Modbus RTU 장비를 정의하고 연결해 
 장비별 동작 차이는 실행 엔진이 지원하는 Step과 decoder 범위에서 JSON Profile/Recipe로 표현합니다. 실제 장비에 필요한 프로토콜 능력이 현재 엔진에 없을 때만 엔진을 확장합니다.
 
 현재 구현 범위는 CWT-TH04S 온습도 센서의 측정, Catalog 기반 장비 탐색, Slave ID/baudrate 변경, 관리용 Test Group 저장·실행입니다. Catalog 관리에는 JSON 검증, 활성/비활성 상태, 300×300 JPEG 썸네일, 참고 파일과 HTTPS 링크가 포함됩니다. 선택 기능인 AI Catalog 작성·수정은 Gemini API를 사용하며, 생성된 제안은 검토·승인 후 저장됩니다.
+
+## 주요 화면
+
+### 장비 카탈로그
+
+Catalog 목록에서 등록된 장비를 검색하고, 장비 연결이나 상세 정보를 열 수 있습니다.
+
+![장비 카탈로그 목록](_images/modbus-studio-01.png)
+
+### 장비 스캔
+
+지원 baudrate와 Slave ID 범위를 지정해 연결된 RS485 장비를 탐색합니다.
+
+![장비 스캔 결과](_images/modbus-studio-02.png)
+
+### 카탈로그 상세와 Recipe
+
+제품 상세에서 Profile JSON, 썸네일, 지원 작업 Recipe와 참고 자료를 확인합니다.
+
+![카탈로그 상세와 Profile](_images/modbus-studio-03.png)
+
+![Recipe 및 참고 자료](_images/modbus-studio-06.png)
+
+### AI 카탈로그 수정
+
+기존 Catalog와 참고 자료를 바탕으로 AI 수정안을 만들고 검토합니다. 제안은 승인 후 적용됩니다.
+
+![AI 카탈로그 수정](_images/modbus-studio-04.png)
+
+### 테스트 그룹 실행
+
+여러 장비의 측정 결과와 실행 상태를 한 화면에서 확인합니다.
+
+![테스트 그룹 실행](_images/modbus-studio-07.png)
 
 ## 설계 원칙
 
