@@ -93,21 +93,20 @@ USB Serial 통신은 사용자의 브라우저에서 실행됩니다. Docker con
 - Node.js 22와 npm
 - Docker Compose 및 외부 Docker network `shared-net`
 - 앱 데이터베이스로 사용할 MySQL 8.4 인스턴스. 데이터베이스는 이 Compose에서 생성하지 않습니다.
-- Google OpenID Connect 앱 설정과 허용할 이메일 주소
+- Google 로그인을 사용할 경우 OpenID Connect 앱 설정과 허용할 이메일 주소
 - Web Serial 사용 시 HTTPS 배포 또는 localhost와 지원 브라우저(Chrome/Edge 계열)
 
 USB Serial 포트는 사용자 브라우저에서만 접근합니다. Backend와 Docker에는 장비 USB를 연결하지 않습니다.
 
 ## 시작
 
+### DB와 `.env` 준비
+
+먼저 공개 예제 설정을 루트 `.env`로 복사하고 실제 값으로 바꿉니다. `.env`에는 비밀번호와 secret이 있으므로 Git에 커밋하지 않습니다.
+
 ```powershell
 Copy-Item .env.sample .env
-docker\dev\run.bat
 ```
-
-`.env.sample`을 `.env`로 복사한 뒤 아래의 데이터베이스 및 앱 설정을 실제 환경에 맞게 바꿉니다. `.env`에는 비밀번호와 secret이 있으므로 Git에 커밋하지 않습니다. Docker Compose는 저장소 루트의 `.env`를 읽어 Backend에 전달하고, Frontend에는 `VITE_*` 공개 설정과 `CORS_ORIGIN`만 빌드 인자로 전달합니다.
-
-### DB와 `.env` 준비
 
 MySQL 8.4 서버와 애플리케이션이 사용할 데이터베이스는 먼저 준비해야 합니다. 이 프로젝트는 MySQL 서버나 데이터베이스 자체를 만들지 않습니다. 새 데이터베이스는 테이블이 없는 빈 상태로 두면 Backend migration이 테이블을 생성하고 버전을 기록합니다. `docker/prod/run.sh`와 `restart.sh`는 배포 후 migration을 실행하며 Backend도 시작 시 미적용 migration을 적용합니다.
 
@@ -124,10 +123,10 @@ GRANT ALL PRIVILEGES ON modbus_manager.* TO 'modbus_app'@'%';
 
 계정은 해당 데이터베이스 범위에서 앱의 읽기·쓰기와 migration의 테이블·인덱스 생성 및 변경을 할 수 있어야 합니다. 앱 테이블을 수동으로 만들지 마세요. 테이블을 미리 만든 DB에는 migration이 자동으로 적용·인식되지 않아 `table already exists` 오류가 날 수 있습니다. 이미 운영 중인 데이터가 있으면 백업한 뒤 현재 schema와 migration 이력을 확인하고 적용해야 합니다. 실행된 migration은 `kysely_migration` 이력 테이블에 기록됩니다.
 
-루트 `.env`에서 최소한 다음 값을 설정합니다. 도메인은 예시이므로 실제 Frontend/API 주소로 교체합니다.
+루트 `.env`에서 최소한 다음 값을 설정합니다. 도메인은 예시이므로 실제 Frontend/API 주소로 교체합니다. Docker 개발 Compose와 운영 Compose는 이 파일을 Backend runtime 설정으로 사용합니다. 개발 Compose는 Frontend에도 전달하며, 운영 Compose는 Frontend 빌드에 공개 가능한 `VITE_*` 설정과 `CORS_ORIGIN`만 전달합니다.
 
 ```dotenv
-NODE_ENV=production
+NODE_ENV=development
 PORT=3000
 CORS_ORIGIN=https://app.example.com
 VITE_API_BASE_URL=https://api.example.com/api
@@ -160,11 +159,55 @@ DATABASE_SSL=false
 
 `NODE_ENV`는 `.env.sample`에서 개발 기본값으로 제공됩니다. 운영 Compose는 Backend의 `NODE_ENV`를 `production`으로 지정하지만, 운영 환경 문서와 설정 일관성을 위해 `.env`에도 `production`을 기록하는 것을 권장합니다. 전체 환경변수와 기본값은 [`.env.sample`](.env.sample)을 기준으로 확인합니다.
 
-개발 Compose는 호스트 포트를 공개하지 않습니다. `run.bat`이 외부 Docker network `shared-net`을 준비합니다. Frontend와 Backend 컨테이너는 해당 네트워크에 연결된 MySQL 및 reverse proxy에서 다음 주소로 접근할 수 있습니다.
+### Docker 개발 환경 (Windows)
+
+MySQL 서버와 앱 데이터베이스를 먼저 준비하고 Backend 컨테이너에서 접근할 수 있도록 `DATABASE_HOST`를 설정합니다. 이 프로젝트의 Compose는 MySQL을 생성하지 않습니다. `docker\dev\run.bat`은 Docker의 외부 `shared-net` 네트워크를 준비하고 Backend와 Frontend 개발 컨테이너를 시작합니다.
+
+개발 Compose는 호스트 포트를 공개하지 않습니다. 브라우저에서 사용하려면 `shared-net`에 연결된 reverse proxy를 통해 Frontend를 제공해야 합니다. `VITE_API_BASE_URL`은 브라우저가 접근할 수 있는 API 주소로, `CORS_ORIGIN`은 사용자가 접속하는 Frontend의 정확한 origin으로 지정합니다.
+
+```powershell
+docker\dev\run.bat
+```
+
+컨테이너 네트워크 안에서 Frontend와 Backend는 다음 주소로 접근할 수 있습니다.
 
 - Frontend container: `http://modbus-frontend:5173`
 - Backend health: `http://modbus-backend:3000/api/health`
 - 외부 주소는 Cloudflare Tunnel 등 reverse proxy에서 위 컨테이너 주소로 연결합니다.
+
+### Node.js 직접 실행
+
+Docker 대신 로컬에서 각 서버를 실행할 수도 있습니다. root `.env`에서 브라우저 기준 API 주소와 origin을 로컬 주소로 설정합니다. 예를 들어 Frontend는 `http://localhost:5173`, Backend API는 `http://localhost:3000/api`를 사용합니다.
+
+```dotenv
+VITE_API_BASE_URL=http://localhost:3000/api
+VITE_ALLOWED_HOSTS=localhost
+CORS_ORIGIN=http://localhost:5173
+```
+
+Vite는 저장소 루트의 `.env`를 읽지만 Backend는 자동으로 `.env`를 읽지 않습니다. Backend 실행 명령에 Node.js의 `--env-file` 옵션을 사용해 환경변수를 전달합니다. 두 서버 모두 DB가 필요하므로, 직접 실행할 때는 `DATABASE_HOST`도 호스트에서 접근 가능한 주소(예: `localhost`)로 바꿉니다. Google 로그인이나 AI Catalog 기능을 쓸 때는 해당 설정도 준비해야 합니다. 로컬에서 Google 로그인을 쓰려면 OIDC callback URL도 `http://localhost:3000/api/auth/google/callback`으로 설정하고 Google 앱 설정에 동일하게 등록합니다.
+
+각 프로젝트 디렉터리에서 의존성을 설치하고 아래 개발 명령을 실행합니다.
+
+```powershell
+cd frontend
+npm ci
+npm run dev
+npm run typecheck
+npm test
+npm run build
+```
+
+Backend는 별도 터미널에서 실행합니다. 마지막 줄은 저장소 루트 `.env`를 읽어 Backend 개발 서버를 시작합니다.
+
+```powershell
+cd backend
+npm ci
+node --env-file=../.env ./node_modules/@nestjs/cli/bin/nest.js start --watch
+npm run typecheck
+npm test
+npm run build
+```
 
 ## 개발 명령
 
@@ -321,19 +364,6 @@ Backend는 Google 인증 설정이 없어도 구성 상태를 Frontend에 표시
 Catalog 첨부 파일은 `catalog_uploads` named volume에 저장됩니다. 해당 volume은 Backend에만 연결되며 Frontend web root에서는 직접 접근할 수 없습니다. Compose의 `down` 명령은 named volume을 삭제하지 않습니다.
 
 AI 작성·수정은 Backend의 `GEMINI_API_KEY`가 있을 때 사용할 수 있습니다. 키는 Backend에만 보관하며 Frontend로 전달하지 않습니다. 제안은 Catalog에 자동 반영되지 않고 관리자가 검토·승인해야 합니다. Gemini 모델·timeout·감사 기록 보존 기간은 `.env.sample`의 `GEMINI_*` 설정으로 조정할 수 있습니다.
-
-로컬 개발에서 Docker 대신 Node.js를 사용할 때는 각 프로젝트 디렉터리에서 아래 명령을 실행합니다.
-
-```powershell
-cd frontend
-npm ci
-npm run dev
-npm run typecheck
-npm test
-npm run build
-```
-
-Backend는 별도 터미널의 `backend` 디렉터리에서 실행합니다. 명령은 `npm ci`, `npm run start:dev`, `npm run typecheck`, `npm test`, `npm run build`이며, 먼저 유효한 `.env`와 접근 가능한 MySQL이 필요합니다.
 
 ## 장비 등록
 
