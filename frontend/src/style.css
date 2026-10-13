@@ -270,6 +270,10 @@ dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .text-link { margin: 0 0 16px; padding: 0; border: 0; color: var(--brand-600); background: transparent; cursor: pointer; font-size: .76rem; font-weight: 700; }
 .text-link.inline { margin: 0; text-align: left; }
 .detail-page-heading { align-items: flex-start; }
+.edit-catalog-context { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; margin-top: 14px; padding: 10px 12px; border-left: 3px solid var(--brand-500); border-radius: 0 8px 8px 0; background: var(--slate-50); }
+.edit-catalog-context strong { color: var(--slate-900); font-size: .88rem; }
+.edit-catalog-context span, .edit-catalog-context code { color: var(--slate-500); font-size: .72rem; }
+.edit-catalog-context code { font-family: inherit; }
 .page-heading-actions { display: flex; gap: 8px; padding-top: 26px; }
 .catalog-overview { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin-bottom: 16px; border-radius: 10px; }
 .catalog-overview > div { display: grid; gap: 5px; padding: 15px 18px; border-right: 1px solid var(--slate-200); }

@@ -4,6 +4,7 @@ import { catalogApi, type CatalogFileItem, type CatalogLinkInput, type CatalogLi
 import FileDropField from '../../components/FileDropField.vue'
 import HelpTooltip from '../../components/HelpTooltip.vue'
 import { HELP_TOOLTIP_COPY } from '../../components/help-tooltip-copy'
+import { documentTypeLabel, linkTypeLabel } from './catalog-asset-labels'
 
 const props = defineProps<{ readonly catalogKey: string; readonly mode: 'files' | 'links' }>()
 const emit = defineEmits<{ error: [message: string] }>()
@@ -78,7 +79,7 @@ onMounted(refresh)
     </section>
     <section class="asset-section surface-card asset-existing-section">
       <div class="section-heading"><div><h3>이미 등록된 파일</h3></div></div>
-      <ul v-if="files.length" class="asset-list"><li v-for="file in files" :key="file.id"><div><strong>{{ file.title }}</strong><span>{{ file.originalName }} · {{ Math.ceil(file.byteSize / 1024) }}KB</span></div><span class="file-status-with-help"><span class="status-pill" :class="file.status === 'clean' ? 'success' : 'warning'">{{ file.status }}</span><HelpTooltip label="파일 검사 상태" :text="HELP_TOOLTIP_COPY.cleanStatus" /></span><div class="inline-actions"><button class="button button-ghost button-compact" type="button" :disabled="file.status !== 'clean'" @click="download(file)">다운로드</button><button class="button danger button-compact" type="button" @click="removeFile(file)">삭제</button></div></li></ul><p v-else class="empty-copy">등록된 참고 파일이 없습니다.</p>
+      <ul v-if="files.length" class="asset-list"><li v-for="file in files" :key="file.id"><div><strong>{{ file.title }}</strong><span>{{ file.originalName }} · {{ Math.ceil(file.byteSize / 1024) }}KB</span><span>문서 유형 · {{ documentTypeLabel(file.documentType) }}</span></div><span class="file-status-with-help"><span class="status-pill" :class="file.status === 'clean' ? 'success' : 'warning'">{{ file.status }}</span><HelpTooltip label="파일 검사 상태" :text="HELP_TOOLTIP_COPY.cleanStatus" /></span><div class="inline-actions"><button class="button button-ghost button-compact" type="button" :disabled="file.status !== 'clean'" @click="download(file)">다운로드</button><button class="button danger button-compact" type="button" @click="removeFile(file)">삭제</button></div></li></ul><p v-else class="empty-copy">등록된 참고 파일이 없습니다.</p>
     </section>
   </template>
   <template v-else>
@@ -88,7 +89,7 @@ onMounted(refresh)
     </section>
     <section class="asset-section surface-card asset-existing-section">
       <div class="section-heading"><div><h3>이미 등록된 링크</h3></div></div>
-      <ul v-if="links.length" class="asset-list"><li v-for="link in links" :key="link.id"><div><strong>{{ link.title }}</strong><a v-if="safeExternalUrl(link.url)" :href="safeExternalUrl(link.url)" target="_blank" rel="noopener noreferrer">{{ link.url }}</a><span v-else>유효하지 않은 URL</span></div><span class="status-pill muted">{{ link.linkType }}</span><div class="inline-actions"><button class="button button-ghost button-compact" type="button" @click="editLink(link)">수정</button><button class="button danger button-compact" type="button" @click="removeLink(link)">삭제</button></div></li></ul><p v-else class="empty-copy">등록된 참고 링크가 없습니다.</p>
+      <ul v-if="links.length" class="asset-list"><li v-for="link in links" :key="link.id"><div><strong>{{ link.title }}</strong><a v-if="safeExternalUrl(link.url)" :href="safeExternalUrl(link.url)" target="_blank" rel="noopener noreferrer">{{ link.url }}</a><span v-else>유효하지 않은 URL</span></div><span class="status-pill muted">{{ linkTypeLabel(link.linkType) }}</span><div class="inline-actions"><button class="button button-ghost button-compact" type="button" @click="editLink(link)">수정</button><button class="button danger button-compact" type="button" @click="removeLink(link)">삭제</button></div></li></ul><p v-else class="empty-copy">등록된 참고 링크가 없습니다.</p>
     </section>
   </template>
 </template>

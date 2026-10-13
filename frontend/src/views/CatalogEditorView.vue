@@ -118,7 +118,13 @@ onMounted(loadForEdit)
 </script>
 
 <template>
-  <header class="page-heading detail-page-heading"><div><p class="eyebrow">{{ mode === 'add' ? 'NEW CATALOG' : 'EDIT CATALOG' }}</p><h1>{{ pageTitle }}</h1><p class="description">{{ pageDescriptionByMode[mode] }}</p></div></header>
+  <header class="page-heading detail-page-heading"><div><p class="eyebrow">{{ mode === 'add' ? 'NEW CATALOG' : 'EDIT CATALOG' }}</p><h1>{{ pageTitle }}</h1><p class="description">{{ pageDescriptionByMode[mode] }}</p>
+    <section v-if="detail && mode !== 'json'" class="edit-catalog-context" aria-label="수정 대상 제품">
+      <strong>{{ detail.title }}</strong>
+      <span>{{ detail.manufacturer }} · {{ detail.model }}</span>
+      <code>{{ detail.catalogKey }}</code>
+    </section>
+  </div></header>
   <p v-if="notice" class="notice" :class="noticeIsSuccess ? 'success' : 'error'">{{ notice }}</p>
   <section v-if="mode === 'add' || mode === 'json'" class="catalog-editor surface-card">
     <div class="editor-fields"><div class="form-field"><span class="field-label"><label for="catalog-title">카탈로그 제목</label><HelpTooltip label="카탈로그 제목" :text="HELP_TOOLTIP_COPY.catalogTitle" /></span><input id="catalog-title" v-model="title" maxlength="160" placeholder="Example TEMP-100 온도 센서"></div><div class="form-field"><span class="field-label"><label for="catalog-definition">CatalogBundle JSON</label><HelpTooltip label="CatalogBundle JSON" :text="HELP_TOOLTIP_COPY.catalogBundle" /></span><textarea id="catalog-definition" v-model="definitionText" rows="28" spellcheck="false" aria-describedby="json-help"></textarea><small id="json-help">입력 JSON은 Schema로 검증하며 코드로 실행하지 않습니다.</small></div></div>
