@@ -1,4 +1,4 @@
-import { SerialFlowControl, SerialParity, type CatalogBundle } from '@modbus-manager/device-catalog-domain'
+import { SerialFlowControl, SerialParity, type CatalogBundle } from '@modbus-studio/device-catalog-domain'
 import { parseApiBaseUrl } from '../http/api-base-url'
 import { DeviceProfileValidator } from '../device-catalog/device-profile-validator'
 import type { TestGroup, TestGroupInput, TestGroupRuntimeSnapshot } from '../application/test-group'

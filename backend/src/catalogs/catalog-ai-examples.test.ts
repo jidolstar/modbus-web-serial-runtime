@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import catalogBundle from '@modbus-manager/device-catalog-domain/examples/cwt-th04s.bundle.json'
+import catalogBundle from '@modbus-studio/device-catalog-domain/examples/cwt-th04s.bundle.json'
 import { selectCatalogAiExamples } from './catalog-ai.service'
 import { CatalogValidationService } from './catalog-validation.service'
 import type { CatalogAiExampleRow } from './catalog.repository'

@@ -14,7 +14,7 @@ import { assertCatalogAiEditInstruction, assertCatalogAiSource, type CatalogAiTe
 import { GeminiCatalogClient } from './gemini-catalog.client'
 import { parseCatalogLinkInput } from './catalog-asset-input'
 import { CatalogRepository, type CatalogAiExampleRow } from './catalog.repository'
-import { RecipeKind, RecipeSchemaVersion, RecipeStepType, type CatalogAiGenerationResult, type CatalogAiMissingEvidence, type CatalogBundle } from '@modbus-manager/device-catalog-domain'
+import { RecipeKind, RecipeSchemaVersion, RecipeStepType, type CatalogAiGenerationResult, type CatalogAiMissingEvidence, type CatalogBundle } from '@modbus-studio/device-catalog-domain'
 import { CatalogService } from './catalog.service'
 
 export interface CatalogAiUpload { readonly stream: Readable; readonly filename: string; readonly mimetype: string }

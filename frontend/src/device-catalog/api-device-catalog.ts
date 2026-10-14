@@ -1,4 +1,4 @@
-import type { CatalogBundle } from '@modbus-manager/device-catalog-domain'
+import type { CatalogBundle } from '@modbus-studio/device-catalog-domain'
 import { parseApiBaseUrl } from '../http/api-base-url'
 import { DeviceCatalogEntryNotFoundError, DeviceCatalogError, DeviceCatalogValidationError } from './catalog-errors'
 import type { DeviceCatalog } from './catalog.types'

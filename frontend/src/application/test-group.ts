@@ -1,4 +1,4 @@
-import type { CatalogBundle, SerialConfig } from '@modbus-manager/device-catalog-domain'
+import type { CatalogBundle, SerialConfig } from '@modbus-studio/device-catalog-domain'
 
 /** API와 편집 화면이 함께 적용하는 Test Group node 최대 개수다. */
 export const TEST_GROUP_MAX_NODES = 30

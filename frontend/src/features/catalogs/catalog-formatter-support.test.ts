@@ -1,4 +1,4 @@
-import { RecipeFormatterType, type CatalogBundle } from '@modbus-manager/device-catalog-domain'
+import { RecipeFormatterType, type CatalogBundle } from '@modbus-studio/device-catalog-domain'
 import cwtBundle from '../../../../common/device-catalog-domain/examples/cwt-th04s.bundle.json'
 import { describe, expect, it } from 'vitest'
 import { RecipeOutputFormatterRegistry } from '../../recipe-engine/recipe-output-formatter'

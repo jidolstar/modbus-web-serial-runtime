@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import type { CatalogBundle } from '@modbus-manager/device-catalog-domain'
+import type { CatalogBundle } from '@modbus-studio/device-catalog-domain'
 import { CATALOG_ERROR_CODES } from './catalog.constants'
 import { CatalogError } from './catalog.error'
 import type { CatalogListQuery, CatalogStatusInput, CatalogUpdateInput, CatalogWriteInput } from './catalog-input'

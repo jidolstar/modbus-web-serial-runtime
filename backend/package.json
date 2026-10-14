@@ -1,5 +1,5 @@
 {
-  "name": "modbus-manager-backend",
+  "name": "modbus-studio-backend",
   "private": true,
   "version": "0.1.0",
   "scripts": {
@@ -20,7 +20,7 @@
     "@fastify/multipart": "^10.1.2",
     "@fastify/rate-limit": "^11.2.0",
     "@fastify/static": "^10.1.4",
-    "@modbus-manager/device-catalog-domain": "file:../common/device-catalog-domain",
+    "@modbus-studio/device-catalog-domain": "file:../common/device-catalog-domain",
     "@nestjs/common": "^12.0.4",
     "@nestjs/core": "^12.0.4",
     "@nestjs/platform-fastify": "^12.0.4",

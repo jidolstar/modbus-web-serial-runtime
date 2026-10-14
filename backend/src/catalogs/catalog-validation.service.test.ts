@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import catalogBundle = require('@modbus-manager/device-catalog-domain/examples/cwt-th04s.bundle.json')
+import catalogBundle = require('@modbus-studio/device-catalog-domain/examples/cwt-th04s.bundle.json')
 import { CatalogError } from './catalog.error'
 import { CatalogValidationService } from './catalog-validation.service'
 

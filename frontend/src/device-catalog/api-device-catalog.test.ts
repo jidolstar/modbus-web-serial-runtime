@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import catalogBundle from '@modbus-manager/device-catalog-domain/examples/cwt-th04s.bundle.json'
+import catalogBundle from '@modbus-studio/device-catalog-domain/examples/cwt-th04s.bundle.json'
 import { ApiDeviceCatalog } from './api-device-catalog'
 
 describe('ApiDeviceCatalog', () => {

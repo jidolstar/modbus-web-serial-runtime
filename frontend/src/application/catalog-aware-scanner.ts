@@ -4,7 +4,7 @@ import { SerialDisconnectedError } from '../serial/serial-errors'
 import type { SerialTransport } from '../serial/serial-transport'
 import { SerialFlowControl, SerialParity, type SerialConfig } from '../serial/serial-types'
 import { findErrorCause, OperationAbortedError, throwIfOperationAborted } from './operation-errors'
-import { STANDARD_MODBUS_BAUD_RATES } from '@modbus-manager/device-catalog-domain'
+import { STANDARD_MODBUS_BAUD_RATES } from '@modbus-studio/device-catalog-domain'
 
 const SERIAL_REOPEN_SETTLE_MS = 100 // baudrate 변경 후 USB-RS485와 RTU 무통신 구간을 안정화하는 대기시간. 예: 100ms
 const SCAN_REQUEST_INTERVAL_MS = 100 // 연속 Slave 요청이 RTU 프레임 간격을 침범하지 않도록 보장하는 대기시간. 예: 100ms

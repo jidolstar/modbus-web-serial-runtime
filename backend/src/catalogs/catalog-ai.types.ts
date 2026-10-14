@@ -1,4 +1,4 @@
-import type { CatalogAiInsufficientEvidence, CatalogAiProposal, CatalogAiSource } from '@modbus-manager/device-catalog-domain'
+import type { CatalogAiInsufficientEvidence, CatalogAiProposal, CatalogAiSource } from '@modbus-studio/device-catalog-domain'
 
 export type CatalogAiJobStatus = 'queued' | 'generating' | 'validating' | 'completed' | 'failed' | 'cancelled'
 

@@ -1,4 +1,4 @@
-import { RecipeFormatterType, type CatalogBundle, type RecipeFormat } from '@modbus-manager/device-catalog-domain'
+import { RecipeFormatterType, type CatalogBundle, type RecipeFormat } from '@modbus-studio/device-catalog-domain'
 import { recipeOutputFormatterRegistry, type RecipeOutputFormatterRegistry } from '../../recipe-engine/recipe-output-formatter'
 
 export interface CatalogFormatterSummary {

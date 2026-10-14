@@ -24,11 +24,11 @@ export interface RoutePresentation {
 }
 
 export interface AppHistoryState {
-  readonly owner: 'modbus-manager' // 다른 script가 기록한 history.state와 앱 이력을 구분하는 고정값이다.
+  readonly owner: 'modbus-studio' // 다른 script가 기록한 history.state와 앱 이력을 구분하는 고정값이다.
   readonly depth: number // 현재 탭에서 앱이 push한 깊이. 0이면 이전 앱 화면을 보장할 수 없다.
 }
 
-const HISTORY_OWNER = 'modbus-manager'
+const HISTORY_OWNER = 'modbus-studio'
 
 const CATALOG_KEY_PATTERN = /^[a-z0-9][a-z0-9._-]{0,99}$/ // API URL에 허용되는 Catalog key. 예: "cwt-th04s"
 

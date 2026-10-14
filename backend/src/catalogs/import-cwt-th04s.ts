@@ -1,4 +1,4 @@
-import catalogBundle = require('@modbus-manager/device-catalog-domain/examples/cwt-th04s.bundle.json')
+import catalogBundle = require('@modbus-studio/device-catalog-domain/examples/cwt-th04s.bundle.json')
 import { loadAppConfig } from '../config/app-config'
 import { createDatabase } from '../database/database.factory'
 import { CatalogRepository } from './catalog.repository'

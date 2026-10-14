@@ -1,5 +1,5 @@
 {
-  "name": "modbus-manager-frontend",
+  "name": "modbus-studio-frontend",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -12,7 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@modbus-manager/device-catalog-domain": "file:../common/device-catalog-domain",
+    "@modbus-studio/device-catalog-domain": "file:../common/device-catalog-domain",
     "ajv": "^8.20.0",
     "vue": "^3.5.21"
   },

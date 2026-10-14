@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import bundle from '@modbus-manager/device-catalog-domain/examples/cwt-th04s.bundle.json'
+import bundle from '@modbus-studio/device-catalog-domain/examples/cwt-th04s.bundle.json'
 import { DeviceProfileValidator } from '../../device-catalog/device-profile-validator'
 import { summarizeCatalogRecipes } from './catalog-recipe-summary'
 

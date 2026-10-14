@@ -26,4 +26,4 @@ export {
   type RecipeValue,
   type ReopenSerialStep,
   type WriteSingleRegisterStep,
-} from '@modbus-manager/device-catalog-domain'
+} from '@modbus-studio/device-catalog-domain'

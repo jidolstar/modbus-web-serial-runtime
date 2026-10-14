@@ -4,7 +4,7 @@ import { rm } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { describe, it } from 'node:test'
 import type sharpFactory from 'sharp'
-import catalogBundle = require('@modbus-manager/device-catalog-domain/examples/cwt-th04s.bundle.json')
+import catalogBundle = require('@modbus-studio/device-catalog-domain/examples/cwt-th04s.bundle.json')
 import { SessionService } from '../auth/session.service'
 import { SessionsRepository } from '../auth/sessions.repository'
 import { UsersRepository } from '../auth/users.repository'

@@ -6,7 +6,7 @@ const props = defineProps<{
   readonly text: string
 }>()
 
-const OPEN_EVENT = 'modbus-manager:help-tooltip-open'
+const OPEN_EVENT = 'modbus-studio:help-tooltip-open'
 const GAP = 8
 const VIEWPORT_MARGIN = 12
 const MAX_WIDTH = 280

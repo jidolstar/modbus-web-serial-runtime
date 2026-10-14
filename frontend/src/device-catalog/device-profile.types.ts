@@ -4,4 +4,4 @@ export {
   type DeviceProfile,
   type DeviceProfileSummary,
   type DeviceRecipeReferences,
-} from '@modbus-manager/device-catalog-domain'
+} from '@modbus-studio/device-catalog-domain'

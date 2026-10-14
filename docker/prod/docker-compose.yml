@@ -31,7 +31,7 @@ services:
     ports:
       - 127.0.0.1:3000:3000
     volumes:
-      - catalog_uploads:/var/lib/modbus-manager/catalog-uploads
+      - catalog_uploads:/var/lib/modbus-studio/catalog-uploads
     healthcheck:
       test:
         - CMD

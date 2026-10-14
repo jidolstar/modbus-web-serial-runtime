@@ -1,4 +1,4 @@
-import { SerialFlowControl, SerialParity, type SerialConfig } from '@modbus-manager/device-catalog-domain'
+import { SerialFlowControl, SerialParity, type SerialConfig } from '@modbus-studio/device-catalog-domain'
 import { TestGroupError } from './test-group.error'
 
 const MAX_NAME_LENGTH = 100

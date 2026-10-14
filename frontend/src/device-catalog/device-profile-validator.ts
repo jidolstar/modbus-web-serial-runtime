@@ -2,10 +2,10 @@ import Ajv, { type ErrorObject, type ValidateFunction } from 'ajv'
 import {
   type CatalogBundle,
   validateCatalogBundleReferences,
-} from '@modbus-manager/device-catalog-domain'
-import catalogBundleSchema from '@modbus-manager/device-catalog-domain/schemas/catalog-bundle.schema.json'
-import deviceProfileSchema from '@modbus-manager/device-catalog-domain/schemas/device-profile.schema.json'
-import recipeSchema from '@modbus-manager/device-catalog-domain/schemas/recipe.schema.json'
+} from '@modbus-studio/device-catalog-domain'
+import catalogBundleSchema from '@modbus-studio/device-catalog-domain/schemas/catalog-bundle.schema.json'
+import deviceProfileSchema from '@modbus-studio/device-catalog-domain/schemas/device-profile.schema.json'
+import recipeSchema from '@modbus-studio/device-catalog-domain/schemas/recipe.schema.json'
 import catalogIndexSchema from './schemas/catalog-index.schema.json'
 import { DeviceCatalogValidationError } from './catalog-errors'
 import type { DeviceCatalogIndex } from './catalog.types'

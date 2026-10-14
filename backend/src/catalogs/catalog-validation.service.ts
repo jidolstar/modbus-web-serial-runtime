@@ -4,10 +4,10 @@ import {
   type CatalogBundle,
   STANDARD_MODBUS_BAUD_RATES,
   validateCatalogBundleReferences,
-} from '@modbus-manager/device-catalog-domain'
-import catalogBundleSchema = require('@modbus-manager/device-catalog-domain/schemas/catalog-bundle.schema.json')
-import deviceProfileSchema = require('@modbus-manager/device-catalog-domain/schemas/device-profile.schema.json')
-import recipeSchema = require('@modbus-manager/device-catalog-domain/schemas/recipe.schema.json')
+} from '@modbus-studio/device-catalog-domain'
+import catalogBundleSchema = require('@modbus-studio/device-catalog-domain/schemas/catalog-bundle.schema.json')
+import deviceProfileSchema = require('@modbus-studio/device-catalog-domain/schemas/device-profile.schema.json')
+import recipeSchema = require('@modbus-studio/device-catalog-domain/schemas/recipe.schema.json')
 import { CATALOG_ERROR_CODES } from './catalog.constants'
 import { CatalogError } from './catalog.error'
 

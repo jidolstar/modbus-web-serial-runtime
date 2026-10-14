@@ -1,8 +1,8 @@
-import catalogBundleSchema = require('@modbus-manager/device-catalog-domain/schemas/catalog-bundle.schema.json')
-import catalogAiGenerationResultSchema = require('@modbus-manager/device-catalog-domain/schemas/catalog-ai-generation-result.schema.json')
-import catalogAiProposalSchema = require('@modbus-manager/device-catalog-domain/schemas/catalog-ai-proposal.schema.json')
-import deviceProfileSchema = require('@modbus-manager/device-catalog-domain/schemas/device-profile.schema.json')
-import recipeSchema = require('@modbus-manager/device-catalog-domain/schemas/recipe.schema.json')
+import catalogBundleSchema = require('@modbus-studio/device-catalog-domain/schemas/catalog-bundle.schema.json')
+import catalogAiGenerationResultSchema = require('@modbus-studio/device-catalog-domain/schemas/catalog-ai-generation-result.schema.json')
+import catalogAiProposalSchema = require('@modbus-studio/device-catalog-domain/schemas/catalog-ai-proposal.schema.json')
+import deviceProfileSchema = require('@modbus-studio/device-catalog-domain/schemas/device-profile.schema.json')
+import recipeSchema = require('@modbus-studio/device-catalog-domain/schemas/recipe.schema.json')
 
 export const CATALOG_AI_PROMPT_VERSION = '2026-09-30.2'
 export const SYSTEM_BAUD_RATES = [1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200] as const

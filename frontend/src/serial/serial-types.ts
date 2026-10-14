@@ -2,7 +2,7 @@ export {
   SerialFlowControl,
   SerialParity,
   type SerialConfig,
-} from '@modbus-manager/device-catalog-domain'
+} from '@modbus-studio/device-catalog-domain'
 
 /** 수신 byte chunk를 전달받는 callback이다. */
 export type SerialDataListener = (receivedBytes: Uint8Array) => void

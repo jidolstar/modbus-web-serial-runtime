@@ -7,7 +7,7 @@ Use this reference for NestJS/Fastify, authentication, API, MySQL, migration, an
 - Parse environment variables once in the composition/configuration layer and expose a validated typed object.
 - Fail startup for missing secrets or database settings required for safe operation. Optional integrations may expose a non-secret unavailable status.
 - Require high-entropy signing keys and validate numeric ranges and URL/origin formats.
-- Use an application-specific MySQL account with only the privileges needed on `modbus_manager.*`; never run the application as MySQL root.
+- Use an application-specific MySQL account with only the privileges needed on `modbus_studio.*`; never run the application as MySQL root.
 - Use versioned migrations. Do not enable ORM schema synchronization in a deployed environment.
 
 ## Authentication and session

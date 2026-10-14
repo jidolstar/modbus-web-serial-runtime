@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { CatalogAiProposal } from '@modbus-manager/device-catalog-domain'
+import type { CatalogAiProposal } from '@modbus-studio/device-catalog-domain'
 import { appendCatalogAiRevision } from './catalog-ai-revision'
 
 const proposal: CatalogAiProposal = {

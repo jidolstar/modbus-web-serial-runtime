@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { describe, it } from 'node:test'
-import catalogBundle = require('@modbus-manager/device-catalog-domain/examples/cwt-th04s.bundle.json')
+import catalogBundle = require('@modbus-studio/device-catalog-domain/examples/cwt-th04s.bundle.json')
 import { SessionService } from '../auth/session.service'
 import { SessionsRepository } from '../auth/sessions.repository'
 import { UsersRepository } from '../auth/users.repository'

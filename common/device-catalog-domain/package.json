@@ -1,5 +1,5 @@
 {
-  "name": "@modbus-manager/device-catalog-domain",
+  "name": "@modbus-studio/device-catalog-domain",
   "version": "0.1.0",
   "private": true,
   "type": "module",

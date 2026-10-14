@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import catalogBundle from '@modbus-manager/device-catalog-domain/examples/cwt-th04s.bundle.json'
+import catalogBundle from '@modbus-studio/device-catalog-domain/examples/cwt-th04s.bundle.json'
 import catalogIndex from '../test-fixtures/device-catalog/index.json'
 import changeBaudRateRecipe from '../test-fixtures/device-catalog/cwt-th04s/change-baudrate.recipe.json'
 import changeSlaveIdRecipe from '../test-fixtures/device-catalog/cwt-th04s/change-slave-id.recipe.json'

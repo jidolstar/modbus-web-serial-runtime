@@ -4,7 +4,7 @@ const MAX_SESSION_TTL_SECONDS = 86_400
 const MIN_JWT_SECRET_BYTES = 32
 const DEFAULT_CATALOG_FILE_MAX_BYTES = 20 * 1024 * 1024
 const DEFAULT_CATALOG_THUMBNAIL_MAX_BYTES = 10 * 1024 * 1024
-const DEFAULT_CATALOG_UPLOAD_ROOT = '/var/lib/modbus-manager/catalog-uploads'
+const DEFAULT_CATALOG_UPLOAD_ROOT = '/var/lib/modbus-studio/catalog-uploads'
 const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash-lite'
 
 export const GOOGLE_CONFIGURATION_KEYS = [
@@ -46,7 +46,7 @@ export interface AppConfig {
     readonly status: GoogleOidcConfigurationStatus
   }
   readonly catalogUploads: {
-    readonly rootPath: string // Backend 전용 volume의 절대 경로. 예: "/var/lib/modbus-manager/catalog-uploads"
+    readonly rootPath: string // Backend 전용 volume의 절대 경로. 예: "/var/lib/modbus-studio/catalog-uploads"
     readonly fileMaxBytes: number // 일반 참고 파일의 최대 크기. 예: 20971520
     readonly thumbnailMaxBytes: number // 썸네일 원본의 최대 크기. 예: 10485760
   }

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
-import type { CatalogBundle } from '@modbus-manager/device-catalog-domain'
+import type { CatalogBundle } from '@modbus-studio/device-catalog-domain'
 import { Kysely, Selectable } from 'kysely'
 import { DATABASE } from '../database/database.module'
 import { CatalogsTable, DatabaseSchema } from '../database/database.types'

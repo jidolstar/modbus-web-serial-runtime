@@ -4,7 +4,7 @@ import {
   type CatalogBundle,
   type RecipeFormat,
   type RecipeOutput,
-} from '@modbus-manager/device-catalog-domain'
+} from '@modbus-studio/device-catalog-domain'
 import { recipeOutputFormatterRegistry, type RecipeOutputFormatterRegistry } from '../../recipe-engine/recipe-output-formatter'
 
 export interface CatalogRecipeSummary {

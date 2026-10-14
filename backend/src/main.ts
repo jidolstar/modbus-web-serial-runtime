@@ -44,7 +44,7 @@ async function bootstrap(): Promise<void> {
   })
 
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('Modbus Manager API')
+    .setTitle('Modbus Studio API')
     .setDescription(
       'Google 인증, 서버 관리형 세션, 장비 메타데이터를 제공하는 Backend API입니다. Web Serial/Modbus 통신은 브라우저에서 실행됩니다.',
     )
@@ -54,7 +54,7 @@ async function bootstrap(): Promise<void> {
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig)
   SwaggerModule.setup('api/docs', app, swaggerDocument, {
     jsonDocumentUrl: 'api/docs-json',
-    customSiteTitle: 'Modbus Manager API Docs',
+    customSiteTitle: 'Modbus Studio API Docs',
     swaggerOptions: { withCredentials: true },
   })
 

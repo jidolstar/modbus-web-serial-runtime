@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import exampleBundle from '@modbus-manager/device-catalog-domain/examples/cwt-th04s.bundle.json'
+import exampleBundle from '@modbus-studio/device-catalog-domain/examples/cwt-th04s.bundle.json'
 import { catalogApi, CatalogApiError, type CatalogDetail } from '../device-catalog/catalog-api'
 import type { AppRoute } from '../device-catalog/catalog-route'
 import { DeviceProfileValidator } from '../device-catalog/device-profile-validator'

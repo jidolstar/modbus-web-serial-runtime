@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import type { CatalogAiProposal } from '@modbus-manager/device-catalog-domain'
+import type { CatalogAiProposal } from '@modbus-studio/device-catalog-domain'
 import type { CatalogAiFile } from '../../device-catalog/catalog-ai-api'
 import type { CatalogAiRevisionSummary } from '../../device-catalog/catalog-ai-revision'
 import FileDropField from '../../components/FileDropField.vue'

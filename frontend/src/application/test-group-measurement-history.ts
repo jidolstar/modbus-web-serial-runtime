@@ -1,4 +1,4 @@
-import { RecipeFormatterType, type RecipeOutput } from '@modbus-manager/device-catalog-domain'
+import { RecipeFormatterType, type RecipeOutput } from '@modbus-studio/device-catalog-domain'
 import type { TestGroupNodeResult, TestGroupNodeStatus } from './test-group-run-result'
 import type { TestGroupRuntimeSnapshot } from './test-group'
 

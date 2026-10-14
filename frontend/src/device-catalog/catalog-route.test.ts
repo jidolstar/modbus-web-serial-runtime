@@ -48,8 +48,8 @@ describe('catalog route', () => {
   it('accepts only app-owned history state and increments its depth', () => {
     expect(parseAppHistoryState(null)).toBeNull()
     expect(parseAppHistoryState({ owner: 'other-app', depth: 3 })).toBeNull()
-    expect(parseAppHistoryState({ owner: 'modbus-manager', depth: -1 })).toBeNull()
-    expect(initialAppHistoryState(null)).toEqual({ owner: 'modbus-manager', depth: 0 })
-    expect(nextAppHistoryState({ owner: 'modbus-manager', depth: 2 })).toEqual({ owner: 'modbus-manager', depth: 3 })
+    expect(parseAppHistoryState({ owner: 'modbus-studio', depth: -1 })).toBeNull()
+    expect(initialAppHistoryState(null)).toEqual({ owner: 'modbus-studio', depth: 0 })
+    expect(nextAppHistoryState({ owner: 'modbus-studio', depth: 2 })).toEqual({ owner: 'modbus-studio', depth: 3 })
   })
 })

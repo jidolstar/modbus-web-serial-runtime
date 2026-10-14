@@ -1,5 +1,5 @@
 import { ColumnType, Generated } from 'kysely'
-import type { CatalogBundle, SerialFlowControl, SerialParity } from '@modbus-manager/device-catalog-domain'
+import type { CatalogBundle, SerialFlowControl, SerialParity } from '@modbus-studio/device-catalog-domain'
 
 export interface UsersTable {
   id: Generated<number>

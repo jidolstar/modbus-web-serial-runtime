@@ -17,7 +17,7 @@ import { testGroupsMigration } from './migrations/20260925_007-test-groups'
 import { catalogAiRequestsMigration } from './migrations/20260928_008-catalog-ai-requests'
 import { removeTestGroupNodeCatalogRevisionMigration } from './migrations/20261012_009-remove-test-group-node-catalog-revision'
 
-const MIGRATION_LOCK_NAME = 'modbus_manager_migrations'
+const MIGRATION_LOCK_NAME = 'modbus_studio_migrations'
 const MIGRATION_LOCK_TIMEOUT_SECONDS = 30
 
 class StaticMigrationProvider implements MigrationProvider {

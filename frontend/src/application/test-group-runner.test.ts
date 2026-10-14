@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { RecipeExecutionStatus, type RecipeExecutionResult, type RecipeRunner } from '../recipe-engine/recipe-execution.types'
 import { TestGroupRunner } from './test-group-runner'
-import catalog from '@modbus-manager/device-catalog-domain/examples/cwt-th04s.bundle.json'
+import catalog from '@modbus-studio/device-catalog-domain/examples/cwt-th04s.bundle.json'
 import { DeviceProfileValidator } from '../device-catalog/device-profile-validator'
 import { SerialFlowControl, SerialParity } from '../serial/serial-types'
 import type { TestGroup } from './test-group'

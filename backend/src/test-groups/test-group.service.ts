@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import type { CatalogBundle, SerialConfig } from '@modbus-manager/device-catalog-domain'
+import type { CatalogBundle, SerialConfig } from '@modbus-studio/device-catalog-domain'
 import { CatalogRepository } from '../catalogs/catalog.repository'
 import { CatalogValidationService } from '../catalogs/catalog-validation.service'
 import { TestGroupError } from './test-group.error'

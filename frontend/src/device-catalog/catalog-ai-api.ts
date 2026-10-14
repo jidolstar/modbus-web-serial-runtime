@@ -1,4 +1,4 @@
-import type { CatalogAiInsufficientEvidence, CatalogAiMissingEvidence, CatalogAiProposal, CatalogAiSource } from '@modbus-manager/device-catalog-domain'
+import type { CatalogAiInsufficientEvidence, CatalogAiMissingEvidence, CatalogAiProposal, CatalogAiSource } from '@modbus-studio/device-catalog-domain'
 import { parseApiBaseUrl } from '../http/api-base-url'
 import { CatalogApiError } from './catalog-api'
 

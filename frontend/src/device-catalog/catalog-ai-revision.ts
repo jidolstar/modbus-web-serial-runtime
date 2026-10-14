@@ -1,4 +1,4 @@
-import type { CatalogAiProposal } from '@modbus-manager/device-catalog-domain'
+import type { CatalogAiProposal } from '@modbus-studio/device-catalog-domain'
 
 /** 검토 모달이 과거 JSON 전체를 복제하지 않고 생성 경과만 보여주기 위한 페이지 메모리 값이다. */
 export interface CatalogAiRevisionSummary {

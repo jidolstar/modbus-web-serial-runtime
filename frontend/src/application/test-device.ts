@@ -1,4 +1,4 @@
-import type { SerialConfig } from '@modbus-manager/device-catalog-domain'
+import type { SerialConfig } from '@modbus-studio/device-catalog-domain'
 import type { CatalogDetail } from '../device-catalog/catalog-api'
 
 export type TestDeviceOrigin = 'catalog' | 'scan'

@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import Ajv from 'ajv'
-import type { CatalogAiProposalEnvelope } from '@modbus-manager/device-catalog-domain'
-import catalogAiProposalSchema = require('@modbus-manager/device-catalog-domain/schemas/catalog-ai-proposal.schema.json')
-import catalogBundleSchema = require('@modbus-manager/device-catalog-domain/schemas/catalog-bundle.schema.json')
-import deviceProfileSchema = require('@modbus-manager/device-catalog-domain/schemas/device-profile.schema.json')
-import recipeSchema = require('@modbus-manager/device-catalog-domain/schemas/recipe.schema.json')
-import catalogBundle = require('@modbus-manager/device-catalog-domain/examples/cwt-th04s.bundle.json')
+import type { CatalogAiProposalEnvelope } from '@modbus-studio/device-catalog-domain'
+import catalogAiProposalSchema = require('@modbus-studio/device-catalog-domain/schemas/catalog-ai-proposal.schema.json')
+import catalogBundleSchema = require('@modbus-studio/device-catalog-domain/schemas/catalog-bundle.schema.json')
+import deviceProfileSchema = require('@modbus-studio/device-catalog-domain/schemas/device-profile.schema.json')
+import recipeSchema = require('@modbus-studio/device-catalog-domain/schemas/recipe.schema.json')
+import catalogBundle = require('@modbus-studio/device-catalog-domain/examples/cwt-th04s.bundle.json')
 import { buildCatalogAiPrompt, hasUsableCatalogMeasurement, parseCatalogAiEnvelope, parseCatalogAiGenerationResult } from './catalog-ai.service'
 import { CatalogError } from './catalog.error'
 import { CATALOG_AI_INSTRUCTIONS, CATALOG_AI_OUTPUT_SCHEMA, CATALOG_AI_PROMPT_VERSION } from './catalog-ai-prompt'
