@@ -42,7 +42,7 @@ services:
       # Backend AJV가 Frontend와 같은 최신 Schema 파일을 사용하도록 package 경로도 연결한다.
       - ../../common/device-catalog-domain:/workspace/backend/node_modules/@modbus-studio/device-catalog-domain:ro
       - backend_node_modules_studio:/workspace/backend/node_modules
-      - catalog_uploads:/var/lib/modbus-studio/catalog-uploads
+      - catalog_uploads:${CATALOG_UPLOAD_ROOT:-/var/lib/modbus-studio/catalog-uploads}
     healthcheck:
       test:
         - CMD
@@ -66,3 +66,6 @@ volumes:
   frontend_node_modules_studio:
   backend_node_modules_studio:
   catalog_uploads:
+    # 업로드 자료의 수명은 Compose와 분리해 down -v에도 삭제되지 않게 한다.
+    external: true
+    name: ${CATALOG_UPLOAD_VOLUME_NAME:?CATALOG_UPLOAD_VOLUME_NAME is required}

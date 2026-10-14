@@ -180,6 +180,8 @@ DATABASE_SSL=false
 | `DATABASE_NAME` | Backend가 사용할 기존 MySQL database. 필수값이며 새 설치의 샘플 이름은 `modbus_studio`입니다. 앱이 DB/계정 자체를 만들지는 않습니다. |
 | `DATABASE_USER` / `DATABASE_PASSWORD` | 앱 전용 MySQL 계정과 비밀번호. migration에 필요한 테이블·인덱스 권한이 필요합니다. |
 | `DATABASE_SSL` | MySQL TLS 사용 여부. `true` 또는 `false`이며 기본값은 `false`입니다. |
+| `COMPOSE_PROJECT_NAME` | 이전 Compose 프로젝트의 컨테이너를 이어받을 때 쓰는 기존 프로젝트 이름. Docker Compose에서만 사용하며 새 설치에서는 생략할 수 있습니다. |
+| `CATALOG_UPLOAD_VOLUME_NAME` | Docker Compose가 연결할 기존 외부 업로드 volume의 실제 이름. Compose 실행 시 필수이며 없는 volume을 자동 생성하지 않습니다. Node.js 직접 실행에는 사용하지 않습니다. |
 | `CATALOG_UPLOAD_ROOT` | Catalog 파일 저장 경로. 생략 시 `/var/lib/modbus-studio/catalog-uploads`; Backend 전용 절대 경로를 사용합니다. |
 | `CATALOG_FILE_MAX_BYTES` | 일반 참고 파일의 최대 크기(byte). 기본 `20971520`, 허용 범위 `1024~104857600`. |
 | `CATALOG_THUMBNAIL_MAX_BYTES` | 썸네일 파일 최대 크기(byte). 기본 `10485760`, 허용 범위 `1024~26214400`. |
@@ -196,7 +198,13 @@ MySQL 주소·계정과 `DATABASE_NAME`은 실제로 준비한 DB에 맞춰야 �
 
 MySQL 서버와 앱 데이터베이스를 먼저 준비하고 Backend 컨테이너에서 접근할 수 있도록 `DATABASE_HOST`를 설정합니다. 이 프로젝트의 Compose는 MySQL을 생성하지 않습니다. `docker\dev\run.bat`은 Docker의 외부 `shared-net` 네트워크를 준비하고 Backend와 Frontend 개발 컨테이너를 시작합니다.
 
-기존 설치를 업데이트할 때 개발 Compose는 `@modbus-studio/device-catalog-domain`이 설치된 새 의존성 volume을 사용합니다. 이전 패키지명으로 설치된 volume은 그대로 남지만 더는 연결하지 않습니다. `catalog_uploads` volume은 계속 사용하므로 Catalog 첨부 자료를 삭제하려고 `docker compose down -v`를 실행하지 마세요. 소스를 갱신한 뒤 아래 실행 명령으로 이미지를 다시 빌드하고 컨테이너를 재생성합니다.
+기존 설치를 업데이트할 때 개발 Compose는 `@modbus-studio/device-catalog-domain`이 설치된 새 의존성 volume을 사용합니다. 이전 패키지명으로 설치된 volume은 그대로 남지만 더는 연결하지 않습니다. Catalog 첨부 자료는 기존 Backend 컨테이너에 연결된 업로드 volume을 그대로 사용해야 합니다. 아래 명령에서 업로드 경로에 연결된 volume의 **실제 이름**을 확인해 `.env`의 `CATALOG_UPLOAD_VOLUME_NAME`에 입력하세요. 존재하지 않는 이름이면 Compose가 시작을 거부하지만, 다른 기존 volume의 이름을 지정하면 해당 자료가 보이므로 이름을 반드시 대조해야 합니다.
+
+```powershell
+docker inspect modbus-backend --format '{{range .Mounts}}{{if eq .Type "volume"}}{{.Name}} {{.Destination}}{{println}}{{end}}{{end}}'
+```
+
+새 설치에서는 `docker volume create modbus_studio_catalog_uploads`로 volume을 먼저 만들고 `CATALOG_UPLOAD_VOLUME_NAME=modbus_studio_catalog_uploads`를 지정합니다. 소스를 갱신한 뒤 아래 실행 명령으로 이미지를 다시 빌드하고 컨테이너를 재생성합니다. 예전 Compose 파일에서 실행 중인 컨테이너를 이어받으려면 `.env`의 `COMPOSE_PROJECT_NAME`에 기존 프로젝트 이름을 지정하세요. 프로젝트 이름은 `docker inspect modbus-backend --format '{{index .Config.Labels "com.docker.compose.project"}}'`로 확인할 수 있습니다.
 
 개발 Compose는 호스트 포트를 공개하지 않습니다. 브라우저에서 사용하려면 `shared-net`에서 컨테이너에 접근하는 reverse proxy가 필요합니다. `VITE_API_BASE_URL`은 브라우저가 접근할 API 주소로, `CORS_ORIGIN`은 사용자가 접속할 Frontend의 정확한 origin으로 지정합니다.
 
@@ -295,6 +303,8 @@ cd /var/www/modbus
 cp .env.sample .env
 nano .env
 ```
+
+새 설치에서는 `docker volume create modbus_studio_catalog_uploads`를 실행하고 `.env`에 `CATALOG_UPLOAD_VOLUME_NAME=modbus_studio_catalog_uploads`를 지정합니다. 기존 설치를 업그레이드할 때는 새 volume을 만들지 말고 기존 Backend의 업로드 volume 이름을 확인해 지정하세요. 외부 volume이 없으면 Compose는 시작하지 않습니다.
 
 최소한 아래 공개 URL을 실제 도메인으로 설정합니다. API base URL에는 `/api`가 포함되어야 합니다. Google OIDC callback, DB 연결, allowlist와 secret 값도 실제 운영 설정으로 바꿉니다.
 
@@ -404,13 +414,13 @@ git pull --ff-only
 ./docker/prod/stop.sh
 ```
 
-`stop.sh`는 컨테이너만 중지·제거하며 Catalog 업로드 named volume은 보존합니다. 업로드와 외부 MySQL은 서버 백업에 포함해야 합니다. EC2 Security Group에는 SSH와 nginx용 80/443만 공개하고 Docker 앱 포트 3000/5173은 공개하지 않습니다.
+`stop.sh`는 컨테이너만 중지·제거합니다. Catalog 업로드 volume은 외부 volume으로 관리하므로 `docker compose down -v`에도 삭제되지 않습니다. 업로드와 외부 MySQL은 서버 백업에 포함해야 합니다. EC2 Security Group에는 SSH와 nginx용 80/443만 공개하고 Docker 앱 포트 3000/5173은 공개하지 않습니다.
 
 Backend는 Google 인증 설정이 없어도 구성 상태를 Frontend에 표시할 수 있지만 로그인하려면 OIDC 설정이 필요합니다. 개발 Compose는 소스를 bind mount해 변경을 감지합니다. 운영 Compose는 정적 Frontend와 빌드된 Backend를 사용합니다. 두 Compose 모두 MySQL을 생성하지 않으며 `DATABASE_HOST`에 지정한 DB에 연결합니다.
 
-Catalog 첨부 파일은 `catalog_uploads` named volume에 저장됩니다. 해당 volume은 Backend에만 연결되며 Frontend web root에서는 직접 접근할 수 없습니다. Compose의 `down` 명령은 named volume을 삭제하지 않습니다.
+Catalog 첨부 파일은 `.env`의 `CATALOG_UPLOAD_VOLUME_NAME`으로 선택한 외부 Docker volume에 저장됩니다. 해당 volume은 Backend에만 연결되며 Frontend web root에서는 직접 접근할 수 없습니다. Compose는 이 외부 volume을 생성하거나 삭제하지 않습니다. 별도의 `docker volume rm` 명령이나 Docker 데이터 삭제에 대비해 백업은 계속 필요합니다.
 
-기존 설치를 업그레이드할 때는 현재 `.env`의 `DATABASE_NAME`과 사용자 지정 `CATALOG_UPLOAD_ROOT`를 유지하세요. 샘플의 새 DB 이름으로 설정만 바꾸면 기존 데이터가 자동 이동하지 않습니다. 이름을 바꾸려면 먼저 MySQL 데이터를 이전해야 합니다. 같은 Compose 프로젝트를 계속 사용하면 기존 `catalog_uploads` volume을 새 컨테이너 경로에 다시 연결합니다. Compose 밖에서 기본 업로드 경로를 사용했다면 기존 경로를 `CATALOG_UPLOAD_ROOT`로 지정하거나 파일을 새 `/var/lib/modbus-studio/catalog-uploads`로 옮기세요. 세션 token의 발급자 값이 바뀌므로 재배포 뒤에는 다시 로그인해야 합니다.
+기존 설치를 업그레이드할 때는 현재 `.env`의 `DATABASE_NAME`과 사용자 지정 `CATALOG_UPLOAD_ROOT`를 유지하세요. 샘플의 새 DB 이름으로 설정만 바꾸면 기존 데이터가 자동 이동하지 않습니다. 이름을 바꾸려면 먼저 MySQL 데이터를 이전해야 합니다. 기존 업로드 volume의 실제 이름을 `CATALOG_UPLOAD_VOLUME_NAME`에 지정하면 새 컨테이너 경로에 같은 자료를 연결합니다. Compose 밖에서 기본 업로드 경로를 사용했다면 기존 경로를 `CATALOG_UPLOAD_ROOT`로 지정하거나 파일을 새 `/var/lib/modbus-studio/catalog-uploads`로 옮기세요. 세션 token의 발급자 값이 바뀌므로 재배포 뒤에는 다시 로그인해야 합니다.
 
 ## 장비 등록
 

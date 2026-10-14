@@ -31,7 +31,7 @@ services:
     ports:
       - 127.0.0.1:3000:3000
     volumes:
-      - catalog_uploads:/var/lib/modbus-studio/catalog-uploads
+      - catalog_uploads:${CATALOG_UPLOAD_ROOT:-/var/lib/modbus-studio/catalog-uploads}
     healthcheck:
       test:
         - CMD
@@ -53,3 +53,6 @@ networks:
 
 volumes:
   catalog_uploads:
+    # 기존 업로드 volume의 정확한 이름을 지정해야 데이터가 새 volume으로 가려지지 않는다.
+    external: true
+    name: ${CATALOG_UPLOAD_VOLUME_NAME:?CATALOG_UPLOAD_VOLUME_NAME is required}
