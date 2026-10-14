@@ -196,6 +196,8 @@ MySQL 주소·계정과 `DATABASE_NAME`은 실제로 준비한 DB에 맞춰야 �
 
 MySQL 서버와 앱 데이터베이스를 먼저 준비하고 Backend 컨테이너에서 접근할 수 있도록 `DATABASE_HOST`를 설정합니다. 이 프로젝트의 Compose는 MySQL을 생성하지 않습니다. `docker\dev\run.bat`은 Docker의 외부 `shared-net` 네트워크를 준비하고 Backend와 Frontend 개발 컨테이너를 시작합니다.
 
+기존 설치를 업데이트할 때 개발 Compose는 `@modbus-studio/device-catalog-domain`이 설치된 새 의존성 volume을 사용합니다. 이전 패키지명으로 설치된 volume은 그대로 남지만 더는 연결하지 않습니다. `catalog_uploads` volume은 계속 사용하므로 Catalog 첨부 자료를 삭제하려고 `docker compose down -v`를 실행하지 마세요. 소스를 갱신한 뒤 아래 실행 명령으로 이미지를 다시 빌드하고 컨테이너를 재생성합니다.
+
 개발 Compose는 호스트 포트를 공개하지 않습니다. 브라우저에서 사용하려면 `shared-net`에서 컨테이너에 접근하는 reverse proxy가 필요합니다. `VITE_API_BASE_URL`은 브라우저가 접근할 API 주소로, `CORS_ORIGIN`은 사용자가 접속할 Frontend의 정확한 origin으로 지정합니다.
 
 ```powershell

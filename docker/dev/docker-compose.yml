@@ -15,7 +15,8 @@ services:
       - ../../common/device-catalog-domain:/workspace/common/device-catalog-domain:ro
       # file dependency의 설치 시점 복사본 대신 현재 공용 Catalog 계약을 개발 서버가 즉시 사용한다.
       - ../../common/device-catalog-domain:/workspace/frontend/node_modules/@modbus-studio/device-catalog-domain:ro
-      - frontend_node_modules:/workspace/frontend/node_modules
+      # 이전 패키지명으로 설치된 의존성 volume을 재사용하면 새 import를 찾지 못한다.
+      - frontend_node_modules_studio:/workspace/frontend/node_modules
     depends_on:
       backend:
         condition: service_healthy
@@ -40,7 +41,7 @@ services:
       - ../../common/device-catalog-domain:/workspace/common/device-catalog-domain:ro
       # Backend AJV가 Frontend와 같은 최신 Schema 파일을 사용하도록 package 경로도 연결한다.
       - ../../common/device-catalog-domain:/workspace/backend/node_modules/@modbus-studio/device-catalog-domain:ro
-      - backend_node_modules:/workspace/backend/node_modules
+      - backend_node_modules_studio:/workspace/backend/node_modules
       - catalog_uploads:/var/lib/modbus-studio/catalog-uploads
     healthcheck:
       test:
@@ -62,6 +63,6 @@ networks:
     name: shared-net
 
 volumes:
-  frontend_node_modules:
-  backend_node_modules:
+  frontend_node_modules_studio:
+  backend_node_modules_studio:
   catalog_uploads:
